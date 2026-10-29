@@ -40277,10 +40277,11 @@ function TitleBar({
       "div",
       {
         className: cn(
-          "desktop-title-bar flex items-center justify-center h-11 select-none relative z-50 transition-shadow duration-200",
+          "desktop-title-bar flex items-center justify-start select-none relative z-50 transition-shadow duration-200",
           showBottomShadow && "shadow-[0_2px_8px_rgba(0,0,0,0.15)] border-b border-border/50"
         ),
-        children: displayThreadInfo ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { "data-capture-redact": "center", className: "text-sm font-medium truncate max-w-[70vw] px-3", children: displayThreadInfo.title === "New Chat" ? t("chat.newChat") : displayThreadInfo.title }) : null
+        style: { height: 52 },
+        children: displayThreadInfo ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { "data-capture-redact": "center", className: "text-sm font-medium truncate flex-1 min-w-0 text-left", style: { marginLeft: 56, marginRight: 106 }, children: displayThreadInfo.title === "New Chat" ? t("chat.newChat") : displayThreadInfo.title }) : null
       }
     );
   }
@@ -42456,11 +42457,11 @@ const Layout = reactExports.memo(function Layout2({ children, chatThreadInfo, sh
                 // Phone: no thread open → no title to show; collapse the
                 // strip instead of leaving a 48px blank band. The fixed
                 // nav buttons live in the safe-area row already.
-                isIOS && !chatThreadInfo ? "h-0" : "h-12",
+                isIOS && !chatThreadInfo ? "h-0" : isIOS ? "" : "h-12",
                 !immediate && "transition-opacity",
                 contentVisible ? "opacity-100" : "opacity-0"
               ),
-              style: { transitionDuration: immediate ? "0ms" : `${fadeDuration}ms` },
+              style: { transitionDuration: immediate ? "0ms" : `${fadeDuration}ms`, ...(isIOS && chatThreadInfo ? { height: 52 } : {}) },
               children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 -bottom-2", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
                 TitleBar,
                 {
@@ -42518,13 +42519,13 @@ const Layout = reactExports.memo(function Layout2({ children, chatThreadInfo, sh
       "div",
       {
         className: cn(
-          "fixed h-12 flex items-center gap-1 z-[100] pointer-events-none ease-out",
+          "fixed flex items-center gap-1 z-[100] pointer-events-none ease-out",
           !immediate && "transition-opacity",
           !isResizing && "transition-all duration-500 ease-in-out",
           buttonsVisible ? "opacity-100" : "opacity-0"
         ),
         style: {
-          top: isIOS ? "max(4px, env(safe-area-inset-top))" : "4px",
+          top: isIOS ? "max(4px, env(safe-area-inset-top))" : "4px", height: isIOS ? 48 : void 0,
           // Phone: a nav-bar row — drawer button left, actions right.
           // Expanded desktop: offset chosen so the compose button's right edge lines up
           // with the sidebar cards' right edge below it at every UI font size.
@@ -59281,7 +59282,7 @@ const ThreadResourcesButton = reactExports.memo(function ThreadResourcesButton2(
   }, []);
   if (total === 0) return null;
   const panelReserve = panelOpen ? (panel?.width ?? 0) + 12 : 0;
-  let rightPx = (isWin98Theme ? isMac ? 66 : 116 : isMac || windowControlsHidden ? 4 : 116) + panelReserve;
+  let rightPx = (isWin98Theme ? isMac ? 66 : 116 : isPhoneShell() ? 56 : isMac || windowControlsHidden ? 4 : 116) + panelReserve;
   if (crewRect) {
     const btnLeftX = windowWidth - (rightPx + 36);
     const btnRightX = windowWidth - (rightPx + 8);
@@ -59352,10 +59353,11 @@ const ThreadResourcesButton = reactExports.memo(function ThreadResourcesButton2(
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       "div",
       {
-        className: "fixed top-1 z-[100] flex h-12 items-center pointer-events-none",
+        className: "fixed top-1 z-[100] flex items-center pointer-events-none",
         style: {
           right: rightPx,
           paddingRight: "8px",
+          height: isPhoneShell() ? 48 : void 0,
           transition: panel?.isResizing ? "none" : "right 300ms ease-out"
         },
         children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pointer-events-auto", style: { WebkitAppRegion: "no-drag" }, children: popover })

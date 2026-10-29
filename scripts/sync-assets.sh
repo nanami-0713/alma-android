@@ -396,4 +396,11 @@ for p in glob.glob('www/assets/*.js'):
 print(f'✓ 文案中性化 {n} 处')
 PYEOF
 
+# ── 3.95 手机顶栏：触控尺寸 + 标题让位 ──────────────────────────
+# renderer 的尺寸全走 rem，root font-size 默认 13px（UI_FONT_SIZE_DEFAULT=13，
+# compact 密度）→ h-11 实算 35.75px、图标 size-4 只有 13px，远低于 Android
+# 48dp 触控标准；"Outputs & Sources" 的 right 偏移又按桌面三个窗口控件算成
+# 116px，手机上把按钮顶到屏幕中部压住会话标题。详见脚本内注释。
+python3 scripts/patch-phone-chrome.py
+
 echo "✓ www/ 就绪（$(du -sh www | cut -f1)）— npx cap sync android"
