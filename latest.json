@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-13",
-  "apk": "alma-android-v0.4.213-13.apk",
-  "notes": "手机顶栏适配：顶栏按钮触控尺寸 44px、图标 20px（不再随 UI 字体缩放变小）；资源按钮归位右上角、标题左对齐让位不再被遮挡；仅改手机壳分支，桌面路径零改动（修复 #1，PR #2）",
+  "tag": "v0.4.213-14",
+  "apk": "alma-android-v0.4.213-14.apk",
+  "notes": "Alma Android 0.4.213-14（renderer 0.4.213）。\n- 下载看门狗掐死涓流 + 检查更新多镜像轮试\n- release.sh 收尾 echo 同样加花括号，bash 3.2 下不再误判 unbound variable",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-13/alma-android-v0.4.213-13.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-13/alma-android-v0.4.213-13.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-14/alma-android-v0.4.213-14.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-14/alma-android-v0.4.213-14.apk"
   ]
 }
