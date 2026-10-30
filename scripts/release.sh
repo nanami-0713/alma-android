@@ -9,6 +9,9 @@
 # 前置：HEAD 干净（www/ 与 android/ 已提交）；test 三件套全绿才会走到 commit
 # （对应「端到端测试和回归测试通过之前不许提交」的项目规则）。
 set -euo pipefail
+# 中文 notes 经 argv 进 python：C locale 下会被 surrogateescape 解码成无效
+# UTF-8，latest.json json.dump 直接炸（surrogates not allowed）。强制 UTF-8。
+export LC_ALL="${LC_ALL:-en_US.UTF-8}" LANG="${LANG:-en_US.UTF-8}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_DIR="${ALMA_TEST_DIR:-$ROOT/../test}"
