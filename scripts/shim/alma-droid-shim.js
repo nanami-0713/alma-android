@@ -103,6 +103,22 @@
     document.head.appendChild(st);
   } catch (e) {}
 
+  // 手机顶栏触控尺寸：renderer 的尺寸全走 rem，root font-size 默认 13px
+  // （UI_FONT_SIZE_DEFAULT=13 / compact 密度）→ h-11 实算 35.75px、图标
+  // size-4 只有 13px，远低于 Android 48dp 触控标准。这里用物理 px 锁死，
+  // 不受 UI 字体缩放影响；!important 是因为 [&_svg:not([class*='size-'])]
+  // :size-4 会盖掉 lucide 的 size 属性。布局让位见 scripts/patch-phone-chrome.py。
+  try {
+    var st2 = document.createElement("style");
+    st2.textContent = [
+      "[data-layout-chrome-actions] button{width:44px!important;height:44px!important;padding:0!important}",
+      "[data-layout-chrome-actions] button svg{width:20px!important;height:20px!important}",
+      'button[aria-label="Outputs & Sources"]{width:40px!important;height:40px!important;padding:0!important}',
+      'button[aria-label="Outputs & Sources"] svg{width:18px!important;height:18px!important}'
+    ].join("");
+    document.head.appendChild(st2);
+  } catch (e) {}
+
   // API 桥：不在本 shim 定义 —— connected 模块的官方 apiServerShim（??= 安装）接管：
   // getBackendMode()（Preferences：remote/local）→ remote+E2E 激活给哨兵 baseURL、
   // local 给 LOCAL_BASE。配对状态读的是 Capacitor Preferences（真机原生存储），
