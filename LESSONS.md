@@ -101,3 +101,14 @@
 - **attributes observer 自激励坑**：observer 加 `attributes:true` 后，pill 自己写 style.cssText 会再触发 observer → 250ms 死循环。修法：位置没变就不写（dataset.pos 缓存比对）。
 - **构建陷阱（重要）**：`./gradlew assembleDebug` **不会**拷 www → `npx cap sync android` 必须先跑，否则 APK 里是 assets/public 的旧 shim（症状：CDP www 测试全绿但装机不生效——先 `unzip -p apk assets/public/alma-droid-shim.js | grep` 验证）。
 - **测试基建**：CDP 套件 for-loop 连跑会端口互撞（上一只 Chrome 未退，下一只 bind 失败）→ 逐个跑或加 sleep；uiautomator dump 的 shell 命令要整体引号（`;` 会被本地 shell 拆开）；AVD 状态污染会让主题断言假失败（探针先 `pm clear` 再测）；杀模拟器后 `~/.android/avd/<avd>/*.lock` 残留会让下次启动超时，rm 掉。
+
+## 2026-10-31 下载涓流掐死看门狗；adb forward 会劫持桌面 CDP 端口；release.sh 的 C locale 陷阱
+
+- **readTimeout 掐不死涓流（本轮根因）**：HttpURLConnection 的 readTimeout 只在「单次 read 完全无数据满 30s」时触发；镜像以 ~15KB/s 匀速回流时每次 read 都有数据 → 永不超时、永不换镜、UI 永远"下载中"（-13 上实测复现：140s 只爬 2MB/39MB）。修复 = 下载看门狗：宽限 15s 且已写 >512KB 后，均速 <128KB/s 即 `IOException("too-slow xB/s")` 弃址换镜像；另加 6min 总时限兜底；计时用 `SystemClock.elapsedRealtime()`（单调钟，不受改时间影响）。
+- **代次检查要在写入之前**：`gen != dlGen` 原来判在 `out.write` 之后——换链瞬间旧线程仍可向已被新线程 truncate 的 .part 交错写一块。移到 read 循环体首行。
+- **检查更新兜底也要多镜像**：raw latest.json 兜底原来只打 `mirrorPrefix()` 一个源，那个镜像挂了整次检查失败（"检查更新有时超时"另一半）。改为 [当前镜像, ...UPDATE.mirrors] 去重轮试；**保留 mirrorKey 空串 = 显式禁用镜像的语义**（空串时不轮试，直连失败即失败）。
+- **adb forward 劫持 CDP 端口（排查 3 小时的环境坑）**：会话遗留的 `adb forward tcp:9223 localabstract:webview_devtools_remote_<旧pid>` 让 adb 占住 127.0.0.1:9223（IPv4）——CDP 套件 spawn 的 Chrome 绑不上自己的调试口，WebSocket 全连进**手机 WebView**（症状：target 是旧 URL、页内 ERR_CONNECTION_REFUSED、location.pathname='/'、断言 no-button）。chrome 新实例只绑 IPv6 [::1] 所以互不报错，极具迷惑性。排查法：`lsof -nP -i :9223` 看占用者是 adb 就 `adb forward --remove-all`。**跑桌面 CDP 套件前先清 adb forwards**。
+- **套件本身会泄漏 Chrome**：cdp-*.mjs 多数 spawn 后不 kill，且固定 sleep(1500) 等调试口——机器高负载（模拟器同跑）下 Chrome 起得慢就 ECONNREFUSED。连环跑前 `pkill -f "remote-debugging-port=92"` 并等进程真的退掉（循环 pgrep），或干脆分次跑。
+- **release.sh C locale 陷阱**：中文 notes 经 argv 传给内嵌 python，LANG 为空/C 时 argv 被 surrogateescape 解码 → `json.dump` 炸 `UnicodeEncodeError: surrogates not allowed`（且炸在 latest.json 一步，build.gradle/latest.json 已改但未提交——重跑前 `git checkout --` 还原）。修复 = 脚本头强制 `LC_ALL/LANG=en_US.UTF-8`。
+- **zsh 把方括号字符串当 glob**：`B=[798,1297][978,1439]; ... $B ...` 会被 zsh 展开成奇怪的东西（tap 坐标全错）。引用变量或改 awk 单命令内联。
+- **uiautomator 装器按钮**：api35 的 PackageInstaller 确认键是 "Update"（不是 Install/安装），Cancel 在左 Update 在右；dump 后 grep text="Update" 取 bounds。
