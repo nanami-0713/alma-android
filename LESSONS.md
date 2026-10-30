@@ -92,3 +92,12 @@
 - **弃用 DownloadManager**（社区共识 + 实测根因）：透明代理对 GitHub 资产回 200 HTML，DownloadManager 照落盘报 SUCCESSFUL。应用内 HttpURLConnection：写盘前验状态码/Content-Type/长度，第一块数据验 zip 魔数 PK，垃圾不落盘直接换镜像；.part 原子改名；代次号 dlGen 让旧线程让位。
 - **AVD 实测事实**：api33 镜像拉起 PackageInstaller 会把 qemu 整个带崩（连崩 3 次的元凶），api30 正常——安装器全链测试用 api30；WebView localStorage 是异步落盘，force-stop 会丢，seed 后必须 location.reload() 触发提交；`cleartext` 白名单走 network_security_config（仅 10.0.2.2），本地 http.server 8808 当下载源。
 - **测试基建坑**：模拟器连环崩时把 8778 静态服务一并带走 → 一串 CDP 套件假失败（no-button/NO_FRAME），先查服务再怀疑代码；qemu 进程名是 qemu-system-x86_64，pkill "emulator" 杀不掉。
+
+## 2026-10-30 横屏左侧空白条 = Capacitor 把挖孔 inset 折成 WebView 边距；pill 穿模 = z-index 压过 renderer 覆层
+
+- **横屏空白条复现法（AVD 实证）**：模拟器开打孔 overlay `adb shell cmd overlay enable com.android.internal.display.cutout.emulation.hole` → `settings put system accelerometer_rotation 0; user_rotation 1` → uiautomator 量 WebView bounds。api35 实测 2400×1080 屏上 WebView=[136,63][2400,1017]——左缘 136px 恰是挖孔外接矩形，被系统报成 displayCutout inset，而 `adjustMarginsForEdgeToEdge:"force"` 让 CapacitorWebView 把 `systemBars|displayCutout` 并集写成四边 margin（CapacitorWebView.edgeToEdgeHandler）。OPPO 打孔在横屏落左缘 → 用户看到的"没什么用的 bar"。窗口本身全幅（API35 EDGE_TO_EDGE_ENFORCED 且 cutoutMode=always），bar 不是系统 letterbox 而是 WebView margin。
+- **修复**：MainActivity 在 super.onCreate 之后 `setOnApplyWindowInsetsListener(webView, …)` **顶掉** Capacitor 的监听（后设者胜）：左右只取 systemBars（挖孔侧贴 0，聊天内容在孔下滚动——全屏应用常态），上下取 systemBars 与 displayCutout 的较大者（竖屏刘海行为不变）；另设 `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES` 兜住 Android≤14（默认模式横屏整个窗口避让挖孔）。实测修复后 WebView=[0,63][2400,1017] 全幅，竖屏 [0,136][1080,2337] 无回归。
+- **pill 穿模**：pill 挂 body、z-index 2147482000 压过 renderer 一切覆层（抽屉面板 z-201/遮罩 z-200/底部动作单 z-130）。修复 = 露头条件加 `!rendererOverlayOpen()`：遮罩（computed z==200 且 pointer-events≠none 且全宽）或面板（z==201 且已滑入）或非自身的全屏 role=dialog。**computed style 判定优于 class 串**（`z-[201]` 是构建产物）。
+- **attributes observer 自激励坑**：observer 加 `attributes:true` 后，pill 自己写 style.cssText 会再触发 observer → 250ms 死循环。修法：位置没变就不写（dataset.pos 缓存比对）。
+- **构建陷阱（重要）**：`./gradlew assembleDebug` **不会**拷 www → `npx cap sync android` 必须先跑，否则 APK 里是 assets/public 的旧 shim（症状：CDP www 测试全绿但装机不生效——先 `unzip -p apk assets/public/alma-droid-shim.js | grep` 验证）。
+- **测试基建**：CDP 套件 for-loop 连跑会端口互撞（上一只 Chrome 未退，下一只 bind 失败）→ 逐个跑或加 sleep；uiautomator dump 的 shell 命令要整体引号（`;` 会被本地 shell 拆开）；AVD 状态污染会让主题断言假失败（探针先 `pm clear` 再测）；杀模拟器后 `~/.android/avd/<avd>/*.lock` 残留会让下次启动超时，rm 掉。

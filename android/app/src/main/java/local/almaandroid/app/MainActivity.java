@@ -10,6 +10,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -75,6 +77,8 @@ public class MainActivity extends BridgeActivity {
             applyWebViewBackground(isNightMode());
             applySystemBars(isNightMode());
             attachImeInsetsListener();
+            allowLandscapeCutout();
+            attachAppInsets();
         }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -158,6 +162,51 @@ public class MainActivity extends BridgeActivity {
             v.setPadding(0, 0, 0, Math.max(0, ime.bottom - bars.bottom));
             return insets;
         });
+    }
+
+    /**
+     * 横屏挖孔全屏铺满（修复横屏左/右侧被挖孔逼出的空白条）。
+     * <p>Android ≤14 默认 layoutInDisplayCutoutMode 在横屏下整个窗口避让挖孔
+     * （系统级 letterbox）；shortEdges 允许窗口延伸进挖孔区，与 Android 15
+     * edge-to-edge 强制行为一致。无挖孔设备（含 AVD 默认）此设置无任何效果。
+     */
+    private void allowLandscapeCutout() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                getWindow().getAttributes().layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            } catch (Throwable t) {
+                // 个别 ROM 不接受则维持系统默认
+            }
+        }
+    }
+
+    /**
+     * 用应用自己的 insets 策略替换 Capacitor 的 WebView 边距
+     * （adjustMarginsForEdgeToEdge=force：边距 = systemBars|displayCutout 并集）。
+     * <p>差异只在横屏左右：挖孔屏左右侧的 displayCutout inset（OPPO 打孔在横屏
+     * 落在左缘，实测 136px）不再折算成 WebView 左右边距 —— 那会得到一条内容
+     * 永远进不去的空白条。聊天内容在孔下滚动是全屏应用的常态；上下仍取
+     * systemBars 与 displayCutout 的较大者，竖屏刘海/状态栏行为不变。
+     * setOnApplyWindowInsetsListener 直接顶掉 Capacitor 在 Bridge 构造时挂的
+     * 监听（本方法在 super.onCreate 之后调用）。
+     */
+    private void attachAppInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets cut = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+            if (v.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+                mlp.leftMargin = bars.left;
+                mlp.rightMargin = bars.right;
+                mlp.topMargin = Math.max(bars.top, cut.top);
+                mlp.bottomMargin = Math.max(bars.bottom, cut.bottom);
+                v.setLayoutParams(mlp);
+            }
+            // 与 Capacitor 原监听一致：insets 不再下传（父容器的键盘补边在先执行）
+            return WindowInsetsCompat.CONSUMED;
+        });
+        webView.requestApplyInsets();
     }
 
     /** uiMode 在 manifest 的 configChanges 里：系统深浅色切换不重建 Activity，手动同步。 */

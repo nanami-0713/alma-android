@@ -187,6 +187,34 @@
     var f = settingsFrame();
     return !!(f && f.style.display !== "none");
   }
+  // renderer 自己的覆层（会盖住主界面，pill 不该浮在它们上面）：
+  // ① 会话抽屉 —— 固定 z-201 左侧面板（关闭态停在屏幕外，遮罩挂 pointer-events-none）
+  // ② 全屏 role=dialog（底部动作单等）。用 computed z-index 判，class 串不稳定。
+  function rendererOverlayOpen() {
+    try {
+      var scrims = document.querySelectorAll('body > div[class*="z-["]');
+      for (var i = 0; i < scrims.length; i++) {
+        var s = scrims[i], sc = getComputedStyle(s);
+        if (sc.position === "fixed" && sc.zIndex === "200" && sc.pointerEvents !== "none"
+            && s.getBoundingClientRect().width >= innerWidth * 0.9) return true;
+      }
+      var panels = document.querySelectorAll('div[class*="z-["]');
+      for (var j = 0; j < panels.length; j++) {
+        var el = panels[j], cs = getComputedStyle(el);
+        if (cs.position !== "fixed" || cs.zIndex !== "201") continue;
+        var r = el.getBoundingClientRect();
+        if (r.width >= 180 && r.height >= innerHeight * 0.7 && r.left > -40 && r.left < 40) return true;
+      }
+      var dl = document.querySelectorAll('[role="dialog"]');
+      for (var k = 0; k < dl.length; k++) {
+        var d = dl[k];
+        if (d.id === "alma-update-dialog") continue;
+        var dr = d.getBoundingClientRect();
+        if (dr.width * dr.height >= innerWidth * innerHeight * 0.5) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
   function hideSettingsFrame() {
     var f = settingsFrame();
     if (f) f.style.display = "none";
@@ -606,22 +634,31 @@
     }
     // 恢复的终态若是 update-available，先把 pill 挂出来（不等下次检查）
     try { ensureUpdatePill(); } catch (e) {}
-    // renderer 重渲染可能吞掉 pill / 布局变化会挪动菜单钮 —— 兜底重挂+重定位
+    // renderer 重渲染可能吞掉 pill / 布局变化会挪动菜单钮 —— 兜底重挂+重定位。
+    // attributes 也要看：抽屉开合是既有节点上的 class/style 变化（滑入动画），
+    // 只看 childList 会漏掉「pill 该让位/归位」的时机。
     var pillObs = null, pillObsTimer = 0;
+    var queueEnsurePill = function () {
+      if (pillObsTimer) return;
+      pillObsTimer = setTimeout(function () {
+        pillObsTimer = 0;
+        try { ensureUpdatePill(); } catch (e) {}
+      }, 250);
+    };
     if (window.MutationObserver) {
-      pillObs = new MutationObserver(function () {
-        if (pillObsTimer) return;
-        pillObsTimer = setTimeout(function () {
-          pillObsTimer = 0;
-          try { ensureUpdatePill(); } catch (e) {}
-        }, 250);
-      });
+      pillObs = new MutationObserver(queueEnsurePill);
       var startObs = function () {
-        if (document.body) pillObs.observe(document.body, { childList: true, subtree: true });
+        if (document.body) pillObs.observe(document.body, {
+          childList: true, subtree: true,
+          attributes: true, attributeFilter: ["class", "style"]
+        });
         else setTimeout(startObs, 400);
       };
       startObs();
     }
+    // 抽屉等覆层靠属性变化驱动（上面的 observer 已覆盖）；点击/动画收尾再兜一层
+    document.addEventListener("click", queueEnsurePill, true);
+    document.addEventListener("transitionend", queueEnsurePill, true);
   }
 
   // 应用信息：version = APK versionName（即内嵌 renderer 版本，与 GitHub tag
@@ -680,6 +717,7 @@
   function updatePillShouldShow() {
     return !inSubframe
       && !settingsLayerOpen()
+      && !rendererOverlayOpen()
       && updateState && updateState.status === "update-available"
       && updateRel && updateRel.tag
       && lsGet(UPDATE.skipKey) !== updateRel.tag;
@@ -716,8 +754,12 @@
       pill.addEventListener("click", function () { showUpdateDialog(); });
       (document.body || document.documentElement).appendChild(pill);
     }
-    // 贴着菜单钮右侧（微微压叠），随其位置校准
+    // 贴着菜单钮右侧（微微压叠），随其位置校准。位置没变就不写 style：
+    // observer 现在也看 attributes，自己写自己看会自激励成常转循环。
     var tr = toggle.getBoundingClientRect();
+    var pos = Math.round(tr.right - 7) + "x" + Math.round(tr.top + (tr.height - 30) / 2);
+    if (pill.dataset.pos === pos) return;
+    pill.dataset.pos = pos;
     pill.style.cssText =
       "position:fixed;z-index:2147482000;display:inline-flex;align-items:center;gap:4px;" +
       "height:30px;padding:0 11px 0 9px;border:0;border-radius:9999px;cursor:pointer;" +
