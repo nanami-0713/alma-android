@@ -503,16 +503,28 @@
       var fb = relFallbacks(apk, m);
       return { tag: rel.tag_name, apk: apk, fallback: fb[0] || "", fallbacks: fb, notes: rel.body || "" };
     }).catch(function (e1) {
-      if (!m) throw e1;
-      return fetchJson(m + "https://raw.githubusercontent.com/" + UPDATE.repo + "/" + UPDATE.branch + "/latest.json", 10000)
-        .then(function (j) {
+      // 显式禁用镜像（mirrorKey 置空串）时保持原语义：直连失败即失败
+      if (m === "") throw e1;
+      // raw latest.json 也按镜像链轮试：只打一个源时，那个镜像恰好挂了
+      // （检查更新「有时超时」的主因之一）整次检查就失败。
+      var prefixes = [];
+      var addP = function (p) { if (p && prefixes.indexOf(p) < 0) prefixes.push(p); };
+      addP(m);
+      for (var mi = 0; mi < UPDATE.mirrors.length; mi++) addP(UPDATE.mirrors[mi]);
+      var rawPath = "https://raw.githubusercontent.com/" + UPDATE.repo + "/" + UPDATE.branch + "/latest.json";
+      var tryRaw = function (i) {
+        if (i >= prefixes.length) throw e1;
+        return fetchJson(prefixes[i] + rawPath, 10000).then(function (j) {
           if (!j || !j.tag || !j.apk) throw new Error("bad-latest");
           var apk = String(j.apk).indexOf("http") === 0 ? String(j.apk)
             : "https://github.com/" + UPDATE.repo + "/releases/download/" + j.tag + "/" + j.apk;
           // latest.json 的 mirrors（完整 URL 数组，release.sh 生成）优先；没有就本地默认链
           var fb = (j.mirrors && j.mirrors.length ? j.mirrors : relFallbacks(apk, m));
           return { tag: j.tag, apk: apk, fallback: fb[0] || "", fallbacks: fb, notes: j.notes || "" };
-        });
+        }, function () { return tryRaw(i + 1); });
+      };
+      if (!prefixes.length) throw e1;
+      return tryRaw(0);
     });
   }
 

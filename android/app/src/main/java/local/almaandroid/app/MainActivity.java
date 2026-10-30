@@ -273,6 +273,12 @@ public class MainActivity extends BridgeActivity {
 
     /** 单地址下载到 .part；响应不是 APK（HTML 错误页/重定向链坏/截断）即判失败。 */
     private boolean downloadToFile(String url, int gen) {
+        // 慢速看门狗：readTimeout 只能掐死「完全断流」，掐不死「涓涓细流」——
+        // 实测 gh-proxy 可以 15KB/s 匀速回，39MB 要 45 分钟，UI 永远"下载中"。
+        // 宽限期后均速低于下限（或超过总时限）即放弃本地址换下一个镜像。
+        final long minBps = 128L * 1024L;
+        final long graceMs = 15000L, deadlineMs = 360000L;
+        long started = android.os.SystemClock.elapsedRealtime();
         java.net.HttpURLConnection c = null;
         try {
             File dir = getExternalFilesDir("updates");
@@ -300,6 +306,8 @@ public class MainActivity extends BridgeActivity {
                 long wrote = 0;
                 boolean first = true;
                 while ((n = in.read(buf)) > 0) {
+                    // 判在写入之前：新一轮已开始时不再向新线程截断过的 .part 交错写
+                    if (gen != dlGen) throw new IOException("superseded");
                     // zip 魔数 PK：第一块数据就验，HTML/网关页即刻拒收不落盘
                     if (first) {
                         if (n < 4 || buf[0] != 'P' || buf[1] != 'K') throw new IOException("not-zip");
@@ -309,7 +317,14 @@ public class MainActivity extends BridgeActivity {
                     wrote += n;
                     if (clen > 0) dlTotal = clen;
                     dlBytes = wrote;
-                    if (gen != dlGen) throw new IOException("superseded");
+                    long elapsed = android.os.SystemClock.elapsedRealtime() - started;
+                    if (elapsed > deadlineMs) {
+                        throw new IOException("deadline " + (wrote * 1000L / Math.max(1, elapsed)) + "B/s");
+                    }
+                    if (wrote > 512L * 1024L && elapsed > graceMs
+                            && wrote * 1000L / Math.max(1, elapsed) < minBps) {
+                        throw new IOException("too-slow " + (wrote * 1000L / Math.max(1, elapsed)) + "B/s");
+                    }
                 }
                 out.flush();
             }
