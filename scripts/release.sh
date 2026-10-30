@@ -114,7 +114,7 @@ sed -i '' -e "s/versionCode $CUR_CODE/versionCode $NEW_CODE/" \
 # assets/public 不进 git：www/ 改动必须同步进去，否则打出旧 web 层
 echo "▶ cap sync android（www → assets/public）"
 ( cd "$ROOT" && npx cap sync android )
-echo "▶ gradle assembleDebug（JDK $JAVA_HOME）"
+echo "▶ gradle assembleDebug（JDK ${JAVA_HOME}）"
 ( cd "$GRADLE" && ./gradlew -q assembleDebug )
 APK="$GRADLE/app/build/outputs/apk/debug/app-debug.apk"
 [ -f "$APK" ] || { echo "✗ 构建产物缺失：$APK" >&2; exit 1; }
@@ -140,9 +140,7 @@ PY
 git add -A
 git commit -m "release: $TAG (versionCode $NEW_CODE)
 
-$NOTES
-
-Co-Authored-By: Claude Code <noreply@anthropic.com>"
+$NOTES"
 git tag "$TAG"
 git push origin main
 git push origin "$TAG"
