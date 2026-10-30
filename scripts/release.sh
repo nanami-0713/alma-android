@@ -151,4 +151,4 @@ gh release create "$TAG" "/tmp/$ASSET#$ASSET" \
   --title "Alma Android $TAG" \
   --notes "$NOTES"
 
-echo "✓ 发布完成：$TAG（资产 $ASSET，latest.json 已随 main 推送）"
+echo "✓ 发布完成：${TAG}（资产 ${ASSET}，latest.json 已随 main 推送）"
