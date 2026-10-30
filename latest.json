@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-11",
-  "apk": "alma-android-v0.4.213-11.apk",
-  "notes": "Alma Android 0.4.213-11（renderer 0.4.213）。\n- 陈旧更新终态死循环 + 返回键历史优先级 + 应",
+  "tag": "v0.4.213-12",
+  "apk": "alma-android-v0.4.213-12.apk",
+  "notes": "Alma Android 0.4.213-12（renderer 0.4.213）。\n- 更新 pill 不再穿模于侧边栏；横屏挖孔屏左侧",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-11/alma-android-v0.4.213-11.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-11/alma-android-v0.4.213-11.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-12/alma-android-v0.4.213-12.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-12/alma-android-v0.4.213-12.apk"
   ]
 }
