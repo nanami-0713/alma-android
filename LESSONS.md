@@ -112,3 +112,10 @@
 - **release.sh C locale 陷阱**：中文 notes 经 argv 传给内嵌 python，LANG 为空/C 时 argv 被 surrogateescape 解码 → `json.dump` 炸 `UnicodeEncodeError: surrogates not allowed`（且炸在 latest.json 一步，build.gradle/latest.json 已改但未提交——重跑前 `git checkout --` 还原）。修复 = 脚本头强制 `LC_ALL/LANG=en_US.UTF-8`。
 - **zsh 把方括号字符串当 glob**：`B=[798,1297][978,1439]; ... $B ...` 会被 zsh 展开成奇怪的东西（tap 坐标全错）。引用变量或改 awk 单命令内联。
 - **uiautomator 装器按钮**：api35 的 PackageInstaller 确认键是 "Update"（不是 Install/安装），Cancel 在左 Update 在右；dump 后 grep text="Update" 取 bounds。
+
+## 2026-10-31 照片图库点了没反应 = renderer 有 JS 桩、壳没带原生插件
+
+- **根因**：composer 的「照片图库/拍照」走 `window.almaCamera`（connected 模块 `installElectronShim()` 无条件 `w.almaCamera ??= cameraShim`，三个方法都调 Capacitor **Camera 插件**），而壳的 package.json 只带了 browser/clipboard/haptics/preferences/share —— Camera 原生实现根本不在 APK 里。`Camera.pickImages()` reject `"Camera" plugin is not implemented on android` → cameraShim.failQuietly 吞成 `[]`/`null` → composer 静默无反应。「选择文件」走隐藏 `<input type=file>` 的 WebView 文件选择，不受影响（可当鉴别症状）。
+- **修复**：`npm i @capacitor/camera@^7` + `npx cap sync android`（自动写入 capacitor.build.gradle / capacitor.settings.gradle）。MainActivity 不用动：CAMERA 运行时权限启动已申请；API 33+ 的 pickImages 走系统 Photo Picker 零权限，旧设备由插件 manifest 合并 READ_MEDIA/READ_EXTERNAL_STORAGE。
+- **教训**：**「JS 侧 registerPlugin 了」≠「原生可用」**——CDP 探针 `Object.keys(Capacitor.Plugins)` 会把没实现的也列出来（JS 注册表而已）；确认原生在不在，得真调用一次看 console 有没有 `[ios] cameraShim.xxx failed: ... not implemented`。升级 renderer 后对照 connected 模块的 `??=` 清单盘点壳插件。
+- **AVD 验证法**：CDP evaluate `window.almaCamera.pickMany(6)`（fire-and-forget，存全局抓终态）→ `dumpsys window | grep mCurrentFocus` 应见 `photopicker.PhotoPickerActivity`。空模拟器造照片：`adb push` 到 /sdcard 后 MEDIA_SCANNER_SCAN_FILE 广播已死，要 `content insert --uri content://media/external/images/media` 建 row 再 `adb exec-in content write --uri …/<id>` 灌真实字节（exec-in 传二进制，adb shell 会掰坏）。选择器多选确认键文本是 `Add (N)`，dump 后按 text 取 bounds。
