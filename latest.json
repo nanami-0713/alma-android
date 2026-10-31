@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-17",
-  "apk": "alma-android-v0.4.213-17.apk",
-  "notes": "检查更新缓存击穿：发布后立刻检查也能拿到最新版（镜像/WebView/API 三层缓存都不再发旧 latest.json）",
+  "tag": "v0.4.213-18",
+  "apk": "alma-android-v0.4.213-18.apk",
+  "notes": "修复：手动安装新版后残留的旧更新态会推荐/下载旧包；启动与下载/安装前均比对版本，旧包不清不装",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-17/alma-android-v0.4.213-17.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-17/alma-android-v0.4.213-17.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-18/alma-android-v0.4.213-18.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-18/alma-android-v0.4.213-18.apk"
   ]
 }
