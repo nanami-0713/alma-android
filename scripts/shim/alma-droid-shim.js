@@ -807,8 +807,10 @@
     downloadUpdate: function () { return doUpdateDownload(); },
     quitAndInstall: function () {
       // 「已下载」对应的版本已装上（手动装过新版后残留的终态）：清掉状态
-      // 回 idle，绝不把磁盘上的旧 APK 递给安装器（原生侧同款兜底会拒收）
-      if (updateRel && updateRel.tag && !isNewer(updateRel.tag, shellVersion())) {
+      // 回 idle，绝不把磁盘上的旧 APK 递给安装器（原生侧同款兜底会拒收）。
+      // 无已知 rel（v0.4.213-18 起启动自愈会作废陈旧 rel）同样不装：
+      // 什么都不该被递给安装器。
+      if (!updateRel || !updateRel.tag || !isNewer(updateRel.tag, shellVersion())) {
         broadcastUpdateState({ status: "idle", checkedAt: Date.now() });
         return;
       }
