@@ -127,3 +127,10 @@
 - **渲染坑**：代码行是绝对定位的虚拟列表（`div.absolute.left-0...white-space:pre`），纯 CSS pre-wrap 会叠行——**必须走组件自己的 wordWrap 状态**（Alt+Z 按钮 → readFileWordWrap/writeFileWordWrap → localStorage）。md 预览的表格/长 token 才用 CSS 兜底（table display:block 横滚 + overflow-wrap:anywhere）。ASCII 图在 pre-wrap 下会散架，属可接受代价（可 Alt+Z 切回）。
 - **测试基建：CDP 桥喂真实 API**（Capacitor 的资产走本地 scheme handler，Fetch 网络拦截看不见）：AVD 上复现「已配对手机」状态 = 持久 CDP 连接里 `Page.addScriptToEvaluateOnNewDocument` 装 defineProperty fetch 陷阱（谁后赋值谁被包进外层），alma.local→10.0.2.2:23001 走 CapacitorHttp（绕 CORS，network_security_config 白名单正好有 10.0.2.2）。坑：①doc-start 注册随连接关闭而失效——必须单连接跑完 reload+驱动；②renderer 的 fetchWithTimeout 用模块级 `guardedNativeFetch`（init 时捕获），引擎/engine 包装都拦不到，所以陷阱必须在页面加载前就位；③打开 dock 的入口是**聊天气泡里的文件卡片**（会 ensure workspace），资源弹层行点击在 `!ws.workspaceId` 时静默 no-op，行点击弹的是动作菜单要再点 Preview；④拍照权限弹窗会挡截图（pm clear 后首启），uiautomator 按文本找按钮关掉。
 - **dock 关闭钮定位法**：`.dock-tab-bar` 的 button 列表最后一个（x=375, 26px）实测点击即关；前一个是折叠（x=348）。都无 aria-label，别猜，CDP 点一遍验证。
+
+## 2026-10-31 竖屏 dock 关闭钮仍被盖：z-index 被父级层叠上下文封顶
+
+- **-16 实机反馈**：横屏 X 重叠好了，竖屏没好。-16 的竖屏方案是「全屏覆盖层 z-index:2147480000 压过 z-100 固定顶栏」——**这个假设是错的**：dock 住在 `div.relative.z-10.h-screen.flex` 里，父级的 stacking context 把子元素 z-index 封顶（对外等效 z-10），外面一切 fixed（顶栏 z-100、抽屉 z-200/201）照样浮在整页 dock 上。横屏当时显式 visibility:hidden 了撞位钮所以好了，竖屏裸奔。
+- **诊断手法**：`document.elementsFromPoint(x,y)` 取叠层序列（plural 版才给全序），配合沿 parentElement 链收集 position/z-index——一眼看出 chrome 钮(fixed,100) 在 dock 钮(fixed,2147480000)<(relative,10) 之上。
+- **修法**：竖屏规则补 `body:has([data-right-dock]) [data-layout-chrome-actions], body:has([data-right-dock]) .fixed.top-1.z-\[100\] {visibility:hidden}`（整行 + 资源宿主；横屏维持只隐右侧钮组）。dock 打开时竖屏右上角唯一可点元素 = dock 自己的关闭钮。抽屉（z-201）虽也浮在 dock 上，但整行隐藏后竖屏全屏页无抽屉入口，状态不可达。
+- **教训**：**「整页覆盖 + 大 z-index」在有层叠上下文祖先时是幻觉**——跨上下文比的是祖先的 z。上模拟器验证时要用 elementsFromPoint 在「出事坐标」确认 topmost 归属，不能只看自己的 rect/截图中部。

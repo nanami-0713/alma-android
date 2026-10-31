@@ -130,8 +130,7 @@
     var st3 = document.createElement("style");
     st3.textContent = [
       // 竖屏：dock 整页化。width/min-width/max-width 用 !important 顶掉内联
-      // style 写入的 effectiveWidth（300px）；inset:0 铺满视口；z-index 压过
-      // 顶栏固定钮（z-100）与 renderer 覆层（z-201），仍低于设置层/更新弹窗。
+      // style 写入的 effectiveWidth（300px）；inset:0 铺满视口。
       "@media (orientation: portrait){",
       "[data-right-dock]{position:fixed!important;inset:0!important;",
       "width:100vw!important;min-width:100vw!important;max-width:100vw!important;",
@@ -141,6 +140,15 @@
       "background:var(--background)!important;}",
       // 拖宽把手在全屏页里没有意义，还挡左侧边缘触摸
       "[data-right-dock]>.cursor-col-resize{display:none!important}",
+      // ⚠ dock 的 z-index 再大也被父级 `relative z-10 h-screen flex` 的层叠
+      // 上下文封顶 —— 外层 fixed 顶栏（z-100 新建对话钮等）照样浮在整页
+      // dock 之上盖住其关闭钮（-16 实机：竖屏 X 仍不可点、横屏正常）。
+      // z-index 无解，唯一出路：dock 开着时把固定顶栏整行 + 资源宿主
+      // visibility:hidden（关闭钮从此是右上角唯一可点元素；关 dock 即恢复）。
+      // 抽屉（z-201）同理浮在 dock 上，但整行隐藏后竖屏全屏页里已无入口
+      // 打开抽屉，状态不可达。
+      "body:has([data-right-dock]) [data-layout-chrome-actions],",
+      'body:has([data-right-dock]) .fixed.top-1.z-\\[100\\]{visibility:hidden!important}',
       "}",
       // 横屏：dock 打开时，与其头部右侧撞位的固定元素让位（visibility 保布局）
       "@media (orientation: landscape){",
