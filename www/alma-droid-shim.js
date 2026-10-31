@@ -536,12 +536,19 @@
   });
 
   function fetchJson(url, timeoutMs) {
+    // 缓存击穿：版本检查必须拿「现在」的答案。三重缓存都可能发旧版本——
+    // ①WebView HTTP 缓存（fetch 默认遵循响应头，镜像站常给 max-age）；
+    // ②镜像站边缘缓存（gh-proxy 前面 Fastly/CF，实测发布后数分钟内还回
+    //   旧 latest.json——v0.4.213-16 发布 3 分钟后实机检查仍拿 -15 的
+    //   元凶；其缓存键含 query string，实测唯一 qs 必 MISS 回源）；
+    // ③GitHub API 自身 60s 缓存。查询参数加时间戳 + cache:no-cache 双保险。
+    var bust = (url.indexOf("?") > -1 ? "&" : "?") + "_=" + Date.now();
     return new Promise(function (resolve, reject) {
       var done = false;
       var timer = setTimeout(function () {
         if (!done) { done = true; reject(new Error("timeout")); }
       }, timeoutMs || 10000);
-      fetch(url, { headers: { Accept: "application/vnd.github+json" } })
+      fetch(url + bust, { cache: "no-cache", headers: { Accept: "application/vnd.github+json" } })
         .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
         .then(function (j) { if (!done) { done = true; clearTimeout(timer); resolve(j); } })
         .catch(function (err) { if (!done) { done = true; clearTimeout(timer); reject(err); } });
