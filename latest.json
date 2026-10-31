@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-16",
-  "apk": "alma-android-v0.4.213-16.apk",
-  "notes": "工作区侧栏手机适配：竖屏文件整页视图（不再与会话挤排）、关闭钮/返回键可达、文件预览默认自动换行",
+  "tag": "v0.4.213-17",
+  "apk": "alma-android-v0.4.213-17.apk",
+  "notes": "检查更新缓存击穿：发布后立刻检查也能拿到最新版（镜像/WebView/API 三层缓存都不再发旧 latest.json）",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-16/alma-android-v0.4.213-16.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-16/alma-android-v0.4.213-16.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-17/alma-android-v0.4.213-17.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-17/alma-android-v0.4.213-17.apk"
   ]
 }
