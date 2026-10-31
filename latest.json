@@ -1,9 +1,8 @@
 {
-  "tag": "v0.4.213-19",
-  "apk": "alma-android-v0.4.213-19.apk",
-  "notes": "修复竖屏文件页关闭钮仍被顶栏新建对话钮盖住的问题（层叠上下文封顶，改为隐藏顶栏；横屏不变）",
+  "tag": "v0.4.213-20",
+  "apk": "alma-android-v0.4.213-20.apk",
+  "notes": "下载修复：看门狗放宽至 40KB/s 底线与 20 分钟总时限（国内晚间唯一可用镜像约 115KB/s，旧阈值会掐死正常慢速下载）；清理失效镜像",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-19/alma-android-v0.4.213-19.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-19/alma-android-v0.4.213-19.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-20/alma-android-v0.4.213-20.apk"
   ]
 }
