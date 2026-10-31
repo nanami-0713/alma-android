@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-15",
-  "apk": "alma-android-v0.4.213-15.apk",
-  "notes": "修复：照片图库/拍照点了没反应（壳内补装 Capacitor Camera 原生插件）；选择文件路径不受影响",
+  "tag": "v0.4.213-16",
+  "apk": "alma-android-v0.4.213-16.apk",
+  "notes": "工作区侧栏手机适配：竖屏文件整页视图（不再与会话挤排）、关闭钮/返回键可达、文件预览默认自动换行",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-15/alma-android-v0.4.213-15.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-15/alma-android-v0.4.213-15.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-16/alma-android-v0.4.213-16.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-16/alma-android-v0.4.213-16.apk"
   ]
 }
