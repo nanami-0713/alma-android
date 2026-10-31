@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-18",
-  "apk": "alma-android-v0.4.213-18.apk",
-  "notes": "修复：手动安装新版后残留的旧更新态会推荐/下载旧包；启动与下载/安装前均比对版本，旧包不清不装",
+  "tag": "v0.4.213-19",
+  "apk": "alma-android-v0.4.213-19.apk",
+  "notes": "修复竖屏文件页关闭钮仍被顶栏新建对话钮盖住的问题（层叠上下文封顶，改为隐藏顶栏；横屏不变）",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-18/alma-android-v0.4.213-18.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-18/alma-android-v0.4.213-18.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-19/alma-android-v0.4.213-19.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-19/alma-android-v0.4.213-19.apk"
   ]
 }
