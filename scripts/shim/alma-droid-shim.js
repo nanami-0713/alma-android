@@ -119,6 +119,60 @@
     document.head.appendChild(st2);
   } catch (e) {}
 
+  // ── 工作区侧栏（Outputs & Sources 打开的 dock）手机适配 ──────────
+  // renderer 的 dock 是桌面右侧分栏：resolveDockWidth 在窄屏把它钳到 ≤300px，
+  // 与会话区同层挤排（竖屏实拍：会话列被挤成 ~110px 一列一字）。手机语义
+  // 应该是「文件页」：竖屏 = 全屏覆盖层（position:fixed 压过顶栏固定钮，
+  // dock 自带的关闭钮不再被新建对话钮盖住）；横屏保留分栏（宽度足够），
+  // 但 dock 打开时藏掉与 dock 头部右侧撞位的固定钮（右上钮组 + 资源宿主）。
+  // :has() 需 Chromium 105+，与 webview-gate 的 111 门槛兼容。
+  try {
+    var st3 = document.createElement("style");
+    st3.textContent = [
+      // 竖屏：dock 整页化。width/min-width/max-width 用 !important 顶掉内联
+      // style 写入的 effectiveWidth（300px）；inset:0 铺满视口；z-index 压过
+      // 顶栏固定钮（z-100）与 renderer 覆层（z-201），仍低于设置层/更新弹窗。
+      "@media (orientation: portrait){",
+      "[data-right-dock]{position:fixed!important;inset:0!important;",
+      "width:100vw!important;min-width:100vw!important;max-width:100vw!important;",
+      "z-index:2147480000!important;border-left:0!important;",
+      // dock 本体是 bg-muted/30（分栏下的毛玻璃感）：整页模式下后面的会话
+      // 会透出来，全屏页必须不透明（内容区自带实底，这里兜最底层）。
+      "background:var(--background)!important;}",
+      // 拖宽把手在全屏页里没有意义，还挡左侧边缘触摸
+      "[data-right-dock]>.cursor-col-resize{display:none!important}",
+      "}",
+      // 横屏：dock 打开时，与其头部右侧撞位的固定元素让位（visibility 保布局）
+      "@media (orientation: landscape){",
+      "body:has([data-right-dock]) [data-layout-chrome-actions]>div:last-child,",
+      'body:has([data-right-dock]) .fixed.top-1.z-\\[100\\]{visibility:hidden!important}',
+      "}",
+      // 触控目标：dock tab 栏右端两个 26px 图标钮（折叠/关闭）提到 36px；
+      // 文件面包屑行（h-8）里的 19px 图标钮（含关闭文件）提到 28px。
+      '[data-right-dock] .dock-tab-bar>.flex-shrink-0.items-center~button',
+      "{min-width:36px!important;min-height:36px!important}",
+      "[data-right-dock] .h-8>.size-5{min-width:28px!important;min-height:28px!important}",
+      // 预览排版兜底：表格横向滚动、图片限宽、长 token（URL/哈希/路径）可断行。
+      // 代码行的换行由 renderer 自己的 wordWrap 状态管（见下方 localStorage 预置），
+      // 这里只管 markdown 预览与表格。
+      "[data-right-dock] table{display:block;max-width:100%;overflow-x:auto}",
+      "[data-right-dock] img,[data-right-dock] video{max-width:100%}",
+      "[data-right-dock] p,[data-right-dock] li,[data-right-dock] h1,[data-right-dock] h2,",
+      "[data-right-dock] h3,[data-right-dock] h4,[data-right-dock] td,[data-right-dock] th,",
+      "[data-right-dock] dd,[data-right-dock] dt{overflow-wrap:anywhere}"
+    ].join("");
+    document.head.appendChild(st3);
+  } catch (e) {}
+
+  // 文件预览默认自动换行：renderer 的 readFileWordWrap 只认 "1"（"0" = 用户
+  // 明确关过）。手机竖屏 ~300-400px 宽，代码不换行基本没法读。仅首启预置，
+  // 不覆盖用户选择；Alt+Z 开关照常可用。
+  try {
+    if (localStorage.getItem("alma.filePreview.wordWrap") === null) {
+      localStorage.setItem("alma.filePreview.wordWrap", "1");
+    }
+  } catch (e) {}
+
   // API 桥：不在本 shim 定义 —— connected 模块的官方 apiServerShim（??= 安装）接管：
   // getBackendMode()（Preferences：remote/local）→ remote+E2E 激活给哨兵 baseURL、
   // local 给 LOCAL_BASE。配对状态读的是 Capacitor Preferences（真机原生存储），
@@ -301,6 +355,20 @@
         hideSettingsFrame();
         return true;
       }
+      // 工作区侧栏（文件页）开着：返回键 = 关页。竖屏下它是全屏覆盖层
+      // （见上方 CSS），没有它的关闭钮手机上几乎退不出去 —— 返回键是
+      // 主关闭路径。dock tab 栏最后一个按钮是 renderer 的关闭钮（无
+      // aria-label，按 DOM 序取末位；点它走组件自己的状态机与动画）。
+      try {
+        var dock = document.querySelector("[data-right-dock]");
+        if (dock) {
+          var btns = dock.querySelectorAll(".dock-tab-bar button");
+          if (btns.length) {
+            btns[btns.length - 1].click();
+            return true;
+          }
+        }
+      } catch (e) {}
       return false;
     };
   }
