@@ -468,7 +468,7 @@
     // 2026-10-30 实测单一 gh-proxy 对 39MB 资产可慢至 ~15KB/s 拉不完（实机
     // "安装包已损坏"的主因之一）→ 多备几个分散风险；latest.json 的 mirrors
     // 字段（如有）优先生效，可在不发版的情况下远程调整。
-    mirrors: ["https://gh-proxy.com/", "https://ghfast.top/"],
+    mirrors: ["https://gh-proxy.com/"],
     interval: 6 * 60 * 60 * 1000,              // 启动静默检查限频
     skipKey: "alma.android.update.skippedTag"  // 「跳过此版本」记住的 tag（pill 不再露头）
   };

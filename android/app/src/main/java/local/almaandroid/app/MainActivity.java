@@ -274,10 +274,13 @@ public class MainActivity extends BridgeActivity {
     /** 单地址下载到 .part；响应不是 APK（HTML 错误页/重定向链坏/截断）即判失败。 */
     private boolean downloadToFile(String url, int gen) {
         // 慢速看门狗：readTimeout 只能掐死「完全断流」，掐不死「涓涓细流」——
-        // 实测 gh-proxy 可以 15KB/s 匀速回，39MB 要 45 分钟，UI 永远"下载中"。
-        // 宽限期后均速低于下限（或超过总时限）即放弃本地址换下一个镜像。
-        final long minBps = 128L * 1024L;
-        final long graceMs = 15000L, deadlineMs = 360000L;
+        // 但 v0.4.213-19 实测踩坑：国内晚间 gh-proxy ≈115KB/s 是**唯一可用**
+        // 镜像（其余全死/限流），旧阈值 minBps=128KiB/s 把「慢但在干活」也
+        // 杀了 → 下载必死（-19 实机「下载半天然后 timeout」）。放宽为
+        // 40KiB/s 底线 + 20 分钟总时限：115KB/s 时 ~6 分钟可完成；真涓流
+        // （<40KB/s）与死链仍会被掐。40MB 包在 40KB/s 下需 17min < 20min。
+        final long minBps = 40L * 1024L;
+        final long graceMs = 15000L, deadlineMs = 1200000L;
         long started = android.os.SystemClock.elapsedRealtime();
         java.net.HttpURLConnection c = null;
         try {

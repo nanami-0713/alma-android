@@ -84,7 +84,7 @@ COMMITS
   fi
 fi
 # 下载兜底镜像链（与应用内 UPDATE.mirrors 保持一致；latest.json 优先生效）
-MIRROR_BASES="https://gh-proxy.com/ https://ghfast.top/"
+MIRROR_BASES="https://gh-proxy.com/"
 ASSET="alma-android-${TAG}.apk"
 echo "▶ $CUR_NAME ($CUR_CODE) → $NEW_NAME ($NEW_CODE)  tag=$TAG"
 
