@@ -16,7 +16,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Requires JDK **21** and the Android SDK (platform 35). No other local dependencies — the Alma renderer is bundled in `www/` (included with the author's permission).
 
-**Pairing**: on your Mac, open Alma → Settings → Remote Access, show the QR code; on Android: Settings → 我的 Mac → scan (grant camera on first scan). Chats run on your Mac over an E2E-encrypted relay. Provider-key-only mode (no Mac) lives in Settings → 本机 → AI 提供商.
+**Pairing**: on your Mac, open Alma → Settings → Remote Access, show the QR code; on Android: Settings → 我的 Mac → scan (grant camera on first scan). Chats run on your Mac over an E2E-encrypted relay. 
 
 ---
 
@@ -25,10 +25,10 @@ Alma 的非官方 Android 版：**Capacitor 壳 + 与 Mac 安装包完全相同�
 ## 架构（与 iOS Alma 同构）
 
 ```
-┌─ Android 壳（Capacitor 7）──────────────────────────┐
+┌─ Android 壳（Capacitor 7）──────────────────────────────┐
 │ WebView (https scheme) + MainActivity 运行时 CAMERA 授权 │
-│ platform 身份 = "android"（非伪装 ios）                │
-├─ 桥层（两层，??= 共存，shim 先执行优先）────────────────┤
+│ platform 身份 = "android"                               │
+├─ 桥层（两层，shim 先执行优先）─────────────────────────────┤
 │ ① scripts/shim/alma-droid-shim.js                     │
 │    platform.get→"android" / settingsWindow→settings.html│
 │    / haptics / clipboard / ipcRenderer 降级面          │
@@ -49,14 +49,14 @@ yetone iOS 壳的原生桥（`almaIOSConfig` 等）在本项目中由 connected 
 ```
 alma-android/
 ├── www/                    # Alma renderer
-├── android/                # Capacitor Gradle 工程（含官方同款图标）
+├── android/                # Capacitor Gradle 工程
 ├── scripts/sync-assets.sh  # 【可选】升级用：新版 renderer → www/ 全流程重建
 ├── scripts/shim/alma-droid-shim.js
 ├── capacitor.config.json   # appId local.almaandroid.app / androidScheme https
 └── package.json
 ```
 
-## 补丁系统（sync-assets.sh，升级 Alma 版本时重跑）
+## 补丁系统（sync-assets.sh，为适配 Android ）
 
 | 块 | 作用 |
 |---|---|
@@ -71,8 +71,6 @@ alma-android/
 
 ## 机型适配（屏闪 / 状态栏 / 老 WebView 内核）
 
-三个曾由用户反馈的问题与对策（2026-10）：
-
 1. **屏闪（暗色下白闪）**——整条底色链统一为主题色（light `#ffffff` / dark `#282c34`，`values(-night)/colors.xml:launch_background`）：纯色 splash（替换 Capacitor 黑底 PNG）→ `AppTheme.NoActionBar` 的 `windowBackground` → 12+ 系统 splash `windowSplashScreenBackground`（values-v31）→ WebView 底色（`MainActivity`，不再恒白）→ 设置层 iframe 底色（shim `pageBg()`，不再硬编码 `#fff`）。重载/开设置/冷启动各环节不再出现异色空窗。活动补 `windowSoftInputMode=adjustResize`，键盘行为在 ROM 间一致。
 2. **标题顶进状态栏（部分 ROM）**——targetSdk 35 在 Android 15 强制 edge-to-edge，而 Capacitor 的 `adjustMarginsForEdgeToEdge` 默认 `disable`：`capacitor.config.json` 改 `force`，Capacitor 给 WebView 补 systemBars+cutout 边距；键盘 insets 由 `MainActivity` 在 WebView 父容器上补（Capacitor 在 WebView 上 CONSUMED 了 ime）。状态栏/导航栏图标深浅随主题（`WindowInsetsControllerCompat`，shim 经 `__almaAndroidUi.setTheme` 上报应用内主题，系统深浅色切换由 `onConfigurationChanged` 同步）。
 3. **UI 完全无样式（老 WebView 内核，如 MIUI 14 无 Play 更新）**——renderer 主样式表依赖 Chromium 111+（`oklch()` 126 处 / `color-mix()` 1148 处 / `:has()` 19 处）。内核 85–110 时 JS 正常但配色/布局全失效（白框界面，MIUI 还会挂「网页显示异常」提示）；<85 连 `??=` 都无法解析。`alma-webview-gate.js`（**纯 ES5**，注入在所有脚本之前）检测 UA 的 Chromium 版本，低于 111 时全屏给出升级「Android System WebView」的指引（可关闭并记忆）。老设备唯一根治办法是升级系统 WebView（系统应用商店 / 系统应用更新，或侧载 WebView APK）。
@@ -80,7 +78,7 @@ alma-android/
 ## 使用 / 配对
 
 1. Mac 上打开 Alma → 设置 → Remote Access，生成配对二维码（`alma://connect?u=…&e2e=1&k=…` 深链格式）
-2. Android 安装后：设置 → 我的 Mac → 扫码（首扫需授予相机权限；被系统静默拒绝的去 系统设置→应用→Alma→权限 手动开）
+2. Android 安装后：设置 → 我的 Mac → 扫码（需授予相机权限；被系统静默拒绝的去 系统设置→应用→Alma→权限 手动开）
 3. 配对成功自动重载 → 完整手机体验（会话列表/生成跑在 Mac 上，经 E2E 加密中继）
 4. 不连 Mac：设置 → 本机模式（beta）→ AI 提供商，配自己的密钥
 **（注：本机模式暂不完善，待后续开发...）**
