@@ -692,6 +692,16 @@
         return updateRel && updateRel.apk ? doUpdateDownload() : { success: false, error: "no-release" };
       });
     }
+    // 版本闸门：持久化的 rel 可能旧于当前壳（手动 sideload 新版后残留，
+    // v0.4.213-16 实机：-15 的 available 态 + 手装 -16 → 点下载白拉 40MB
+    // 旧包、原生校验拒收后还按镜像链把每个镜像的同一旧包各拉一遍）。
+    // 旧于当前壳 = 无可更新，直接终态 not-available，一个字节都不下。
+    try {
+      if (updateRel.tag && !isNewer(updateRel.tag, shellVersion())) {
+        broadcastUpdateState({ status: "update-not-available", checkedAt: Date.now() });
+        return Promise.resolve({ success: false, error: "stale-release" });
+      }
+    } catch (e) {}
     var r;
     try {
       // fallback 参数 = 镜像 URL 的 JSON 数组（原生侧按序换：下载失败/文件无效）
@@ -717,11 +727,18 @@
   // localStorage 与 updates/alma-update.apk 都还是旧的）→ 清回 idle。否则
   // 设置页永远显示「已下载·重启安装」，点行把旧/坏 APK 递给系统安装器
   // （v0.4.213-10 实机「安装包已损坏」）。原生侧 isValidUpdateApk 同款兜底。
+  // v0.4.213-18 起自愈面扩大到 update-available：手动 sideload 新版后残留的
+  // 「旧版本可更新」态会把旧包当更新递给下载（-16 实机踩坑：手装 -16 后
+  // pill 仍报 -15、下载白拉旧包被原生拒收）。rel 不新于当前壳一律清回 idle。
   try {
-    if (updateState && updateState.status === "update-downloaded"
-        && !(updateRel && updateRel.tag && isNewer(updateRel.tag, shellVersion()))) {
+    var restoredStale = updateState
+      && (updateState.status === "update-downloaded" || updateState.status === "update-available")
+      && !(updateRel && updateRel.tag && isNewer(updateRel.tag, shellVersion()));
+    if (restoredStale) {
+      updateRel = null;             // 内存同步作废（localStorage 之外的活引用）
       updateState = { status: "idle", checkedAt: Date.now() };
       lsSet(UPDATE.stateKey, JSON.stringify(updateState));
+      lsSet(UPDATE.relKey, "");   // rel 一并作废：旧 tag 不许再被下载路径捡走
     }
   } catch (e) {}
   if (!inSubframe) {
