@@ -1,9 +1,9 @@
 {
-  "tag": "v0.4.213-14",
-  "apk": "alma-android-v0.4.213-14.apk",
-  "notes": "Alma Android 0.4.213-14（renderer 0.4.213）。\n- 下载看门狗掐死涓流 + 检查更新多镜像轮试\n- release.sh 收尾 echo 同样加花括号，bash 3.2 下不再误判 unbound variable",
+  "tag": "v0.4.213-15",
+  "apk": "alma-android-v0.4.213-15.apk",
+  "notes": "修复：照片图库/拍照点了没反应（壳内补装 Capacitor Camera 原生插件）；选择文件路径不受影响",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-14/alma-android-v0.4.213-14.apk",
-    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-14/alma-android-v0.4.213-14.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-15/alma-android-v0.4.213-15.apk",
+    "https://ghfast.top/https://github.com/nanami-0713/alma-android/releases/download/v0.4.213-15/alma-android-v0.4.213-15.apk"
   ]
 }
