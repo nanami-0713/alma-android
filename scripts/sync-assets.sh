@@ -19,7 +19,8 @@ python3 - << 'PYEOF'
 import glob, re, shutil
 for src, dst in [('scripts/shim/alma-droid-shim.js', 'www/alma-droid-shim.js'),
                  ('scripts/shim/alma-webview-gate.js', 'www/alma-webview-gate.js'),
-                 ('scripts/shim/alma-local-engine.js', 'www/alma-local-engine.js')]:
+                 ('scripts/shim/alma-local-engine.js', 'www/alma-local-engine.js'),
+                 ('scripts/shim/alma-term-keys.js', 'www/alma-term-keys.js')]:
     shutil.copyfile(src, dst)
 
 for p in glob.glob('www/*.html'):
@@ -31,7 +32,8 @@ for p in glob.glob('www/*.html'):
     m = re.search(r'<body[^>]*>', s)
     tags = '\n<script src="./alma-webview-gate.js"></script>' + \
            '\n<script src="./alma-droid-shim.js"></script>' + \
-           '\n<script src="./alma-local-engine.js"></script>'
+           '\n<script src="./alma-local-engine.js"></script>' + \
+           '\n<script src="./alma-term-keys.js"></script>'
     if m:
         s = s[:m.end()] + tags + s[m.end():]
     else:
