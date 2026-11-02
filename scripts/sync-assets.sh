@@ -22,7 +22,8 @@ for src, dst in [('scripts/shim/alma-droid-shim.js', 'www/alma-droid-shim.js'),
                  ('scripts/shim/alma-lan-direct.js', 'www/alma-lan-direct.js'),
                  ('scripts/shim/alma-local-engine.js', 'www/alma-local-engine.js'),
                  ('scripts/shim/alma-term-keys.js', 'www/alma-term-keys.js'),
-                 ('scripts/shim/alma-screen-remote.js', 'www/alma-screen-remote.js')]:
+                 ('scripts/shim/alma-screen-remote.js', 'www/alma-screen-remote.js'),
+                 ('scripts/shim/alma-diag.js', 'www/alma-diag.js')]:
     shutil.copyfile(src, dst)
 
 for p in glob.glob('www/*.html'):
@@ -547,6 +548,28 @@ for p in ['www/index.html', 'www/settings.html']:
     s = s[:m.start()] + tag + '\n  ' + s[m.start():]
     open(p, 'w', encoding='utf-8').write(s)
     print('✓ 注入桥模块', p)
+PYEOF
+
+# ── 3.6 E2E 文本帧模式旋钮 + 诊断面板 ──────────────────────────────────
+# 0.4.378 起 E2E 内层默认二进制帧；握手是文本、业务数据是二进制。个别 ROM 的
+# WebView 若二进制 WS 帧异常 → 「连接绿了但零内容」。旋钮：localStorage
+# alma.android.e2e.text=1 → E2ESession 不提供 bin（对端回落文本帧）。
+python3 - << 'PYEOF'
+import glob
+patched = 0
+for p in glob.glob('www/assets/connected-*.js'):
+    s = open(p, encoding='utf-8').read()
+    OLD = 'this.offerBinary = opts.binaryFrames ?? true;'
+    NEW = ('this.offerBinary = opts.binaryFrames ?? (function(){ '
+           'try { return localStorage.getItem("alma.android.e2e.text") !== "1"; } '
+           'catch (e) { return true; } })();')
+    if OLD in s:
+        assert s.count(OLD) == 1, 'offerBinary 锚点不唯一: ' + p
+        s = s.replace(OLD, NEW)
+        open(p, 'w', encoding='utf-8').write(s)
+        print('✓ E2E 文本帧旋钮 →', p.split('/')[-1])
+        patched += 1
+assert patched == 1, 'offerBinary 锚点未命中（connected chunk 结构变了）'
 PYEOF
 
 # ── 3.9 文案中性化：iOS 专属措辞 → 设备中性（只动可见整句，不碰 UA/平台检测代码） ──
