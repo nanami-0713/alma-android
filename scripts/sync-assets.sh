@@ -62,11 +62,10 @@ C_NEW = 'isIOS: platform === "ios" || platform === "android", isAndroid: platfor
 D_OLD = 'const [platform, setPlatform] = reactExports.useState("darwin");'
 D_NEW = ('const [platform, setPlatform] = reactExports.useState(function () '
          '{ try { return document.body.dataset.platform || "darwin"; } catch (e) { return "darwin"; } });')
-# settings 标题栏窗口控件：手机壳无桌面窗口控件
-E_OLD = 'if (platform === "ios") return "none";'
-E_NEW = 'if (platform === "ios" || platform === "android") return "none";'
+# E（settings 窗口控件）0.4.378 起上游改为 WindowControls 内 if (isIOS) return null ——
+# 依赖 context.isIOS，C 生效后自动覆盖，无需再补。
 
-PAIRS = [(A_OLD, A_NEW), (B_OLD, B_NEW), (C_OLD, C_NEW), (D_OLD, D_NEW), (E_OLD, E_NEW)]
+PAIRS = [(A_OLD, A_NEW), (B_OLD, B_NEW), (C_OLD, C_NEW), (D_OLD, D_NEW)]
 for p in glob.glob('www/assets/*.js'):
     s = open(p, encoding='utf-8').read()
     o, n = s, 0
@@ -83,7 +82,10 @@ PYEOF
 # 会被长模型名（如 Deepseek-V3.2-Exp）撑死，行总宽超出屏宽，把 shrink-0 的
 # 圆形发送按钮挤出屏幕右缘切半。加 min-w-0 让 chip 收缩（span 自带 truncate）。
 python3 - << 'PYEOF'
-p = 'www/assets/App-CHUt1SP7.js'
+import glob
+p = next((f for f in glob.glob('www/assets/*.js')
+          if 'const chip = "flex h-9 max-w-[46vw] ' in open(f, encoding='utf-8', errors='ignore').read()), None)
+assert p, 'App chunk（composer chip 类定义）未找到'
 s = open(p, encoding='utf-8').read()
 OLD = 'const chip = "flex h-9 max-w-[46vw] '
 NEW = 'const chip = "flex h-9 min-w-0 max-w-[46vw] '
@@ -101,7 +103,10 @@ PYEOF
 # 两个 gutter 都不该留：行内边距改 px-2，外层 paddingRight 归零。
 # isPhoneShell() 为假（桌面/connected）时字符串原样，零回归。
 python3 - << 'PYEOF'
-p = 'www/assets/App-CHUt1SP7.js'
+import glob
+p = next((f for f in glob.glob('www/assets/*.js')
+          if '"pb-2 pl-6 pr-[39px]"' in open(f, encoding='utf-8', errors='ignore').read()), None)
+assert p, 'App chunk（消息行内边距）未找到'
 s = open(p, encoding='utf-8').read()
 n = 0
 
@@ -116,7 +121,7 @@ assert s.count(OLD) == 1, '消息区 paddingRight 锚点数异常'
 s = s.replace(OLD, NEW, 1); n += 1
 
 open(p, 'w', encoding='utf-8').write(s)
-print(f'✓ 手机聊天布局 {n} 处 → App-CHUt1SP7.js')
+print(f'✓ 手机聊天布局 {n} 处 → {p.split("/")[-1]}')
 PYEOF
 
 # ── 2.61 历史对话进入体验：加载空窗期给标题栏占位 ──────────────────────
@@ -126,7 +131,10 @@ PYEOF
 # 抽屉点进来说明列表必然已加载），进入瞬间标题栏就有内容；线程数据到
 # 达后自然替换。仅手机壳生效。
 python3 - << 'PYEOF'
-p = 'www/assets/App-CHUt1SP7.js'
+import glob
+p = next((f for f in glob.glob('www/assets/*.js')
+          if 'const chatThreadInfo = reactExports.useMemo(' in open(f, encoding='utf-8', errors='ignore').read()), None)
+assert p, 'App chunk（chatThreadInfo useMemo）未找到'
 s = open(p, encoding='utf-8').read()
 
 OLD = 'const chatThreadInfo = reactExports.useMemo(\n    () => currentThread ? {'
@@ -152,7 +160,7 @@ assert s.count(OLD2) == 1, 'chatThreadInfo 收尾锚点数异常: ' + str(s.coun
 s = s.replace(OLD2, NEW2, 1)
 
 open(p, 'w', encoding='utf-8').write(s)
-print('✓ 历史对话进入占位 → App-CHUt1SP7.js')
+print('✓ 历史对话进入占位 → ' + p.split('/')[-1])
 PYEOF
 
 # ── 2.7 手机设置：语言行（跟随系统 / 手动切换 en·zh·ja）──
@@ -495,14 +503,16 @@ print('✓ hero 配对引导块移除 →', target.split('/')[-1])
 PYEOF
 
 # ── 3.5 手机桥：复用官方 connected chunk 的桥实现（almaIOSConfig/E2E/全量 Electron shim）──
-# 官方 iOS 壳由原生注入这些桥；Android 壳用 connected-D8mcBngn.js 里的 JS 参考实现。
+# 官方 iOS 壳由原生注入这些桥；Android 壳用 connected chunk 里的 JS 参考实现。
 # boot() 是桌面 handoff 流程（要求 #connect? hash、platform="connected"），不能跑——
 # 换成迷你 boot：只装桥不渲染。全部 ??=，与 shim 共存（shim 先执行，android 身份优先）。
 # 注意：不调 installConnectedWindowBridges（它非 ??= 覆盖 settingsWindow 为桌面 hash 路由）。
 python3 - << 'PYEOF'
-import re
+import re, glob
 
-p = 'www/assets/connected-D8mcBngn.js'
+p = next((f for f in glob.glob('www/assets/connected-*.js')
+          if 'void boot()' in open(f, encoding='utf-8', errors='ignore').read()), None)
+assert p, 'connected chunk（void boot()）未找到'
 s = open(p, encoding='utf-8').read()
 MINI_BOOT = '''// alma-android: 手机迷你 boot —— 只装桥，不做 connected 桌面渲染/hash 配对。
 installElectronShim();
@@ -520,11 +530,12 @@ print('✓ connected chunk → 迷你 boot（装桥不渲染）')
 
 # 入口注入：<head> 里 entry 模块之前加载 connected 模块（同为 deferred，按序执行；
 # shim 是 body 里的非延迟脚本，仍最先执行 → ??= 以 shim 为准）
+name = p.split('/')[-1]
 for p in ['www/index.html', 'www/settings.html']:
     s = open(p, encoding='utf-8').read()
-    if 'connected-D8mcBngn.js' in s:
+    if name in s:
         continue
-    tag = '<script type="module" crossorigin src="./assets/connected-D8mcBngn.js"></script>'
+    tag = f'<script type="module" crossorigin src="./assets/{name}"></script>'
     m = re.search(r'<script type="module"[^>]*src="[^"]*"', s)
     s = s[:m.start()] + tag + '\n  ' + s[m.start():]
     open(p, 'w', encoding='utf-8').write(s)
@@ -534,7 +545,15 @@ PYEOF
 # ── 3.9 文案中性化：iOS 专属措辞 → 设备中性（只动可见整句，不碰 UA/平台检测代码） ──
 python3 - << 'PYEOF'
 import glob
+# 具体键（带 beta 标注）必须排在泛化替换之前，否则先被泛化条目改写、
+# beta 后缀就丢了；旧形态保留 = 幂等。
 REPL = [
+    # 本机模式尚不完善（本地生成等未实现），设置区标题标注 beta（用户要求）
+    ('onThisIphone: "On this iPhone"', 'onThisIphone: "On this device (beta)"'),
+    ('onThisIphone: "On this device"', 'onThisIphone: "On this device (beta)"'),
+    ('onThisIphone: "本机"', 'onThisIphone: "本机模式（beta）"'),
+    ('onThisIphone: "この iPhone"', 'onThisIphone: "この端末（beta）"'),
+    ('onThisIphone: "この端末"', 'onThisIphone: "この端末（beta）"'),
     ('On this iPhone', 'On this device'),
     ('runs on this iPhone', 'runs on this device'),
     ('This iPhone only', 'This device only'),
@@ -554,10 +573,6 @@ REPL = [
     ('Allow it in iOS Settings → Alma.', 'Allow it in system Settings → Alma.'),
     ('相机权限已关闭。请在 iOS 设置 → Alma 中允许。', '相机权限已关闭。请在系统设置 → Alma 中允许。'),
     ('カメラへのアクセスがオフです。iOS の設定 → Alma で許可してください。', 'カメラへのアクセスがオフです。端末の設定 → Alma で許可してください。'),
-    # 本机模式尚不完善（本地生成等未实现），设置区标题标注 beta（用户要求）
-    ('onThisIphone: "On this device"', 'onThisIphone: "On this device (beta)"'),
-    ('onThisIphone: "本机"', 'onThisIphone: "本机模式（beta）"'),
-    ('onThisIphone: "この端末"', 'onThisIphone: "この端末（beta）"'),
 ]
 n = 0
 for p in glob.glob('www/assets/*.js'):

@@ -30,9 +30,11 @@ main-titlebar-frame 拿不到高度 → 只剩 absolute 子元素 → 高度 0�
 
 桌面（isMac / Win-Linux）分支一字未动。
 """
-import sys
-
-P = 'www/assets/App-CHUt1SP7.js'
+import glob, sys
+P = next((f for f in glob.glob('www/assets/*.js')
+          if 'let rightPx = (isWin98Theme ?' in open(f, encoding='utf-8', errors='ignore').read()), None)
+if not P:
+    sys.exit('✗ App chunk（rightPx）未找到')
 s = open(P, encoding='utf-8').read()
 n = 0
 
@@ -88,8 +90,10 @@ REPL = [
      '资源宿主 48px（内联）'),
 
     # 5. 资源按钮 right 偏移：桌面窗口控件 116px → 手机 56px
-    ('let rightPx = (isWin98Theme ? isMac ? 66 : 116 : isMac || windowControlsHidden ? 4 : 116) + panelReserve;',
-     'let rightPx = (isWin98Theme ? isMac ? 66 : 116 : isPhoneShell() ? 56 : isMac || windowControlsHidden ? 4 : 116) + panelReserve;',
+    #    （0.4.378 上游新增 windowControlsHidden ? 4 : 116 分支；isMac 在本
+    #     chunk 压缩成 isMac2 —— 锚点跟着改，语义不变）
+    ('let rightPx = (isWin98Theme ? isMac2 ? 66 : 116 : isMac2 || windowControlsHidden ? 4 : 116) + panelReserve;',
+     'let rightPx = (isWin98Theme ? isMac2 ? 66 : 116 : isPhoneShell() ? 56 : isMac2 || windowControlsHidden ? 4 : 116) + panelReserve;',
      '资源按钮 right 56px'),
 ]
 

@@ -1,0 +1,27 @@
+!function() {
+  try {
+    var e = "undefined" != typeof window ? window : "undefined" != typeof global ? global : "undefined" != typeof globalThis ? globalThis : "undefined" != typeof self ? self : {};
+    e.SENTRY_RELEASE = { id: "alma@0.4.378" };
+  } catch (e2) {
+  }
+}();
+;
+{
+  try {
+    (function() {
+      var e = "undefined" != typeof window ? window : "undefined" != typeof global ? global : "undefined" != typeof globalThis ? globalThis : "undefined" != typeof self ? self : {}, n = new e.Error().stack;
+      n && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[n] = "c8465918-d885-442e-97df-43e7cc559888", e._sentryDebugIdIdentifier = "sentry-dbid-c8465918-d885-442e-97df-43e7cc559888");
+    })();
+  } catch (e) {
+  }
+}
+;
+import haxe from "./haxe-DMQvEC1q.js";
+const lang = Object.freeze(JSON.parse('{"displayName":"HXML","fileTypes":["hxml"],"foldingStartMarker":"--next","foldingStopMarker":"\\\\n\\\\n","name":"hxml","patterns":[{"captures":{"1":{"name":"punctuation.definition.comment.hxml"}},"match":"(#).*$\\\\n?","name":"comment.line.number-sign.hxml"},{"begin":"(?<!\\\\w)(--macro)\\\\b","beginCaptures":{"1":{"name":"keyword.other.hxml"}},"end":"\\\\n","patterns":[{"include":"source.hx#block-contents"}]},{"captures":{"1":{"name":"keyword.other.hxml"},"2":{"name":"support.package.hx"},"4":{"name":"entity.name.type.hx"}},"match":"(?<!\\\\w)(-(?:m|main|-main|-run))\\\\b\\\\s*\\\\b(?:(([a-z][0-9A-Za-z]*\\\\.)*)(_*[A-Z]\\\\w*))?\\\\b"},{"captures":{"1":{"name":"keyword.other.hxml"}},"match":"(?<!\\\\w)(-(?:cppia|cpp?|js|as3|swf-(header|version|lib(-extern)?)|swf9?|neko|python|php|cs|java-lib|java|xml|lua|hl|x|lib|D|resource|exclude|version|v|debug|prompt|cmd|dce\\\\s+(std|full|no)?|-flash-strict|-no-traces|-flash-use-stage|-neko-source|-gen-hx-classes|net-lib|net-std|c-arg|-each|-next|-display|-no-output|-times|-no-inline|-no-opt|-php-front|-php-lib|-php-prefix|-remap|-help-defines|-help-metas|help|-help|java|cs|-js-modern|-interp|-eval|-dce|-wait|-connect|-cwd|-run)).*$"},{"captures":{"1":{"name":"keyword.other.hxml"}},"match":"(?<!\\\\w)(-(?:-js(on)?|-lua|-swf-(header|version|lib(-extern)?)|-swf|-as3|-neko|-php|-cppia|-cpp|-cppia|-cs|-java-lib(-extern)?|-java|-jvm|-python|-hl|p|-class-path|L|-library|-define|r|-resource|-cmd|C|-verbose|-debug|-prompt|-xml|-json|-net-lib|-net-std|-c-arg|-version|-haxelib-global|h|-main|-server-connect|-server-listen)).*$"}],"scopeName":"source.hxml","embeddedLangs":["haxe"]}'));
+const hxml = [
+  ...haxe,
+  lang
+];
+export {
+  hxml as default
+};
