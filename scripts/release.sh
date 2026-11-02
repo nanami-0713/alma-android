@@ -123,7 +123,12 @@ fail=0
 # （9223 被上一只占着 → 下一只假失败，LESSONS 已记）。逐个跑前先 pkill。
 for t in cdp-webview-gate.mjs cdp-e2e.mjs cdp-drawer.mjs cdp-update.mjs cdp-update-pill.mjs cdp-pair-nav.mjs cdp-term-keys.mjs cdp-phone-repro.mjs; do
   [ -f "$TEST_DIR/$t" ] || continue
-  pkill -f "remote-debugging-port=92" 2>/dev/null && sleep 1
+  # 主进程 + helper 都要清：chrome.kill() 只杀主进程，helper（命令行带
+  # --headless 标记，不误伤用户正常 Chrome）残留会拖慢机器 → 后续套件在
+  # 固定等待窗口内页面起不来 → 假失败（2026-11-03 main 发布实测）
+  pkill -f "remote-debugging-port=92" 2>/dev/null
+  pkill -f "Chrome Helper.*--headless" 2>/dev/null
+  sleep 1
   echo "── $t"
   if ! node "$TEST_DIR/$t"; then fail=1; fi
 done
