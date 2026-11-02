@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-33",
-  "apk": "alma-android-v0.4.378-33.apk",
-  "notes": "beta：入口整理与观感修复\n\n- 诊断入口移入设置页（克隆现有行样式，与系统设置浑然一体）\n- 远程屏幕入口在抽屉打开动画首帧即隐藏，不再残留悬浮\n- LESSONS 复盘沉淀（本轮连接事故的完整教训）",
+  "tag": "v0.4.378-34",
+  "apk": "alma-android-v0.4.378-34.apk",
+  "notes": "beta：入口稳定性收尾\n\n- 远程屏幕入口固定锚在顶栏：会话内滚动不再跳动\n- 诊断面板直接在设置层内弹出，无需退出设置查看结果",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-33/alma-android-v0.4.378-33.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-34/alma-android-v0.4.378-34.apk"
   ]
 }
