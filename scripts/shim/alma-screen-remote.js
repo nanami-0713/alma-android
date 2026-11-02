@@ -39,14 +39,17 @@
   var STR = {
     zh: { title: "电脑", done: "完成", viewOnly: "仅查看", conn: "连接中…",
           inputPh: "在电脑上输入", paste: "粘贴", fit: "适合", native: "1:1",
+          panView: "拖动视图（单指平移画面，不触控电脑）",
           offline: "已断开，重连中…", noPerm: "Mac 未授权屏幕录制/辅助功能，仅可观看",
           screen: "远程屏幕", open: "查看这台 Mac 的屏幕并触控" },
     en: { title: "Computer", done: "Done", viewOnly: "View only", conn: "Connecting…",
           inputPh: "Type on the computer", paste: "Paste", fit: "Fit", native: "1:1",
+          panView: "Pan the view (one finger moves the picture, not the computer)",
           offline: "Disconnected, reconnecting…", noPerm: "Grant Screen Recording / Accessibility on the Mac to control it",
           screen: "Remote Screen", open: "View and control this Mac's screen" },
     ja: { title: "コンピュータ", done: "完了", viewOnly: "閲覧のみ", conn: "接続中…",
           inputPh: "コンピュータに入力", paste: "ペースト", fit: "フィット", native: "1:1",
+          panView: "ビューを移動（指1本で画面移動、PC は操作しません）",
           offline: "切断されました。再接続中…", noPerm: "Mac の画面収録/補助機能の許可が必要です",
           screen: "リモート画面", open: "この Mac の画面を見て操作" }
   };
@@ -71,6 +74,7 @@
     viewOnly: false,       // !status.bound → 禁发输入
     zoomFit: true,         // 适合宽高（false = 1:1 原生像素）
     zoom: 1,               // 相对 fit 的倍率（1 = fit）
+    panMode: false,        // 拖动视图模式（放大后单指平移；绕开 ROM 抢三指手势）
     panX: 0, panY: 0,      // 平移（view px，作用于 stage 变换）
     bytes: 0, bytesAt: 0,  // 码率统计（jpeg 通道）
     kbps: 0,
@@ -405,13 +409,30 @@
     var done = document.createElement("button");
     done.type = "button"; done.className = "asv-done"; done.textContent = t("done");
     done.addEventListener("click", closeViewer);
+    // 拖动视图开关（放大后出现）：单指平移画面、不触 Mac。三指平移被 ROM
+    // 抢走的机器（三指截屏/滑动）靠它兜底。
+    var hand = document.createElement("button");
+    hand.type = "button"; hand.className = "asv-hand";
+    hand.title = t("panView"); hand.setAttribute("aria-label", t("panView"));
+    hand.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M2 12h20"/><path d="M12 2l-2.5 2.5M12 2l2.5 2.5M12 22l-2.5-2.5M12 22l2.5-2.5M2 12l2.5-2.5M2 12l2.5 2.5M22 12l-2.5-2.5M22 12l-2.5 2.5"/></svg>';
+    hand.addEventListener("click", function () {
+      S.panMode = !S.panMode;
+      updateHandButton();
+      try { if (window.haptics && window.haptics.tick) window.haptics.tick(); } catch (e) {}
+    });
+    function updateHandButton() {
+      var show = S.zoom > 1.05;
+      hand.style.display = show ? "inline-flex" : "none";
+      hand.classList.toggle("asv-hand-on", S.panMode && show);
+      if (!show && S.panMode) S.panMode = false;
+    }
     var expand = document.createElement("button");
     expand.type = "button"; expand.className = "asv-expand";
     expand.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>';
     expand.setAttribute("aria-label", t("fit") + "/" + t("native"));
     expand.addEventListener("click", toggleZoomMode);
     zoomChip.addEventListener("click", toggleZoomMode);
-    bar.appendChild(title); bar.appendChild(zoomChip); bar.appendChild(expand); bar.appendChild(done);
+    bar.appendChild(title); bar.appendChild(zoomChip); bar.appendChild(hand); bar.appendChild(expand); bar.appendChild(done);
 
     // ── 底部：按键条 + 输入行（iOS 同款布局） ──
     var keys = document.createElement("div");
@@ -420,6 +441,7 @@
       { k: "paste", label: t("paste"), wide: true },
       { k: "esc", label: "esc" },
       { k: "tab", label: "tab" },
+      { k: "backspace", label: "⌫", hold: true },
       { k: "left", label: "←" },
       { k: "up", label: "↑" },
       { k: "down", label: "↓" },
@@ -429,11 +451,26 @@
       var b = document.createElement("button");
       b.type = "button"; b.className = "asv-key" + (d.wide ? " asv-key-wide" : "");
       b.textContent = d.label;
-      b.addEventListener("click", function () {
+      var fire = function () {
         b.classList.add("asv-key-hit");
         setTimeout(function () { b.classList.remove("asv-key-hit"); }, 150);
         if (d.k === "paste") doPaste(); else sendKey(d.k);
-      });
+      };
+      // ⌫ 长按连发（终端里连删多字符）；其余键点按
+      if (d.hold) {
+        var rep = 0;
+        var stopRep = function () { if (rep) { clearInterval(rep); rep = 0; } };
+        b.addEventListener("pointerdown", function () {
+          fire();
+          stopRep();
+          setTimeout(function () { if (!rep) rep = setInterval(fire, 110); }, 380);
+        });
+        ["pointerup", "pointercancel", "pointerleave"].forEach(function (tn) {
+          b.addEventListener(tn, stopRep);
+        });
+      } else {
+        b.addEventListener("click", fire);
+      }
       keys.appendChild(b);
     });
     var inputRow = document.createElement("div");
@@ -454,9 +491,22 @@
       send({ type: "text", text: v });
     }
     sendBtn.addEventListener("click", commit);
+    // 输入框为空时，编辑键直接作用于电脑（回车=Mac 回车、退格=删光标前字符、
+    // 方向键/tab/esc 同理）—— 终端场景打错的字符必须能删（实机反馈）。
+    var EMPTY_KEYS = {
+      "Enter": "enter", "Tab": "tab", "Escape": "esc",
+      "Backspace": "backspace", "Delete": "forwarddelete",
+      "ArrowLeft": "left", "ArrowRight": "right",
+      "ArrowUp": "up", "ArrowDown": "down"
+    };
     input.addEventListener("keydown", function (e) {
       e.stopPropagation();
-      if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); commit(); }
+      if (e.isComposing || e.keyCode === 229) return;   // IME 组字中的键不劫持
+      if (e.key === "Enter") { e.preventDefault(); commit(); return; }
+      if (!input.value && EMPTY_KEYS[e.key]) {
+        e.preventDefault();
+        if (!S.viewOnly) send({ type: "key", key: EMPTY_KEYS[e.key] });
+      }
     });
     inputRow.appendChild(input); inputRow.appendChild(sendBtn);
 
@@ -475,7 +525,7 @@
       root: root, bar: bar, stageWrap: stageWrap, stage: stage, img: img,
       canvas: canvas, video: video,
       stat: stat, dot: dot, zoomChip: zoomChip, badge: badge, toastEl: toastEl,
-      input: input, keys: keys
+      input: input, keys: keys, updateHand: updateHandButton
     };
     installGestures(stageWrap);
     // 容器尺寸变化（布局稳定/旋转/键盘开合）→ 重算 fit 变换。
@@ -540,6 +590,7 @@
     S.zoom = S.zoomFit ? 1 : clamp(nativeZoom(), 1, 8);
     S.panX = 0; S.panY = 0;
     applyTransform();
+    if (S.ui.updateHand) S.ui.updateHand();
   }
   function nativeZoom() {
     // 1:1 = Mac 逻辑像素（status.width 是逻辑宽，如 1470）
@@ -659,6 +710,11 @@
       el.setPointerCapture && el.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
+        // 拖动视图模式：单指只平移画面，不触 Mac（无长按右键/无点击）
+        if (S.panMode) {
+          prim = { pan: true, x: e.clientX, y: e.clientY, moved: false };
+          return;
+        }
         prim = {
           x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
           t0: Date.now(), moved: false, downSent: false,
@@ -694,6 +750,18 @@
       rec.x = e.clientX; rec.y = e.clientY;
 
       if (pointers.size === 1 && prim) {
+        // 拖动视图模式：单指平移 + 速度采样（松手惯性）
+        if (prim.pan) {
+          var pdx = e.clientX - prim.x, pdy = e.clientY - prim.y;
+          if (pdx || pdy) {
+            panBy(pdx, pdy);
+            panMomentum.vx = panMomentum.vx * 0.7 + pdx * 0.3;
+            panMomentum.vy = panMomentum.vy * 0.7 + pdy * 0.3;
+            if (Math.abs(pdx) + Math.abs(pdy) > 2) prim.moved = true;
+          }
+          prim.x = e.clientX; prim.y = e.clientY;
+          return;
+        }
         var dx = e.clientX - prim.x0, dy = e.clientY - prim.y0;
         if (!prim.moved && Math.hypot(dx, dy) > 12) prim.moved = true;
         if (prim.moved) {
@@ -722,6 +790,7 @@
           var ns = clamp(S.zoom * (cur.span / prev.span), 1, 8);
           S.zoom = ns; S.zoomFit = (ns === 1);
           clampPan(); applyTransform();
+          if (S.ui.updateHand) S.ui.updateHand();
         } else if (second.mode === "scroll") {
           second.accX += cx; second.accY += cy;
           var nrm = norm(cur.cx, cur.cy);
@@ -756,21 +825,23 @@
         if (el.__dropNextUp) { el.__dropNextUp = false; prim = null; second = null; third = null; return; }
         if (prim) {
           if (prim.lpTimer) clearTimeout(prim.lpTimer);
-          var dt = Date.now() - prim.t0;
-          var n = norm(e.clientX, e.clientY);
-          if (prim.downSent) {
-            if (n) sendPointer("up", n.x, n.y);
-          } else if (n && !prim.moved && dt < 400) {
-            // 轻点：双击窗口 300ms 内补发 double，否则 click
-            var now = Date.now();
-            if (el.__lastTap && now - el.__lastTap < 300 && el.__lastTapPos
-                && Math.hypot(el.__lastTapPos.x - e.clientX, el.__lastTapPos.y - e.clientY) < 40) {
-              sendPointer("double", n.x, n.y);
-              el.__lastTap = 0;
-            } else {
-              sendPointer("click", n.x, n.y);
-              el.__lastTap = now;
-              el.__lastTapPos = { x: e.clientX, y: e.clientY };
+          if (!prim.pan) {
+            var dt = Date.now() - prim.t0;
+            var n = norm(e.clientX, e.clientY);
+            if (prim.downSent) {
+              if (n) sendPointer("up", n.x, n.y);
+            } else if (n && !prim.moved && dt < 400) {
+              // 轻点：双击窗口 300ms 内补发 double，否则 click
+              var now = Date.now();
+              if (el.__lastTap && now - el.__lastTap < 300 && el.__lastTapPos
+                  && Math.hypot(el.__lastTapPos.x - e.clientX, el.__lastTapPos.y - e.clientY) < 40) {
+                sendPointer("double", n.x, n.y);
+                el.__lastTap = 0;
+              } else {
+                sendPointer("click", n.x, n.y);
+                el.__lastTap = now;
+                el.__lastTapPos = { x: e.clientX, y: e.clientY };
+              }
             }
           }
           prim = null;
@@ -805,7 +876,7 @@
       if (!ok) return;
       S.open = true;
       S.rtcTried = false; S.rtcOn = false; S.frameCount = 0; S.kbps = 0;
-      S.zoom = 1; S.zoomFit = true; S.panX = 0; S.panY = 0;
+      S.zoom = 1; S.zoomFit = true; S.panX = 0; S.panY = 0; S.panMode = false;
       S.status = null; S.capW = 0; S.capH = 0; S.viewOnly = false;
       buildOverlay();
       applyTransform(); updateStatusLine();
@@ -1002,6 +1073,12 @@
     ".asv-expand{all:unset;cursor:pointer;color:#e8eaed;display:inline-flex;align-items:center;",
     "justify-content:center;width:30px;height:30px;border-radius:8px;flex:none;}",
     ".asv-expand:active{background:rgba(255,255,255,.12);}",
+    ".asv-hand{all:unset;cursor:pointer;color:#e8eaed;display:none;align-items:center;",
+    "justify-content:center;width:30px;height:30px;border-radius:8px;flex:none;",
+    "border:1px solid rgba(255,255,255,.16);}",
+    ".asv-hand:active{background:rgba(255,255,255,.12);}",
+    ".asv-hand-on{background:#4da3ff!important;color:#fff!important;",
+    "border-color:transparent!important;}",
     ".asv-done{all:unset;cursor:pointer;color:#4da3ff;font-size:14px;font-weight:600;",
     "padding:5px 10px;flex:none;}",
     ".asv-stage{position:relative;flex:1;min-height:0;overflow:hidden;display:flex;",
