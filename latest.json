@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-23",
-  "apk": "alma-android-v0.4.378-23.apk",
-  "notes": "beta：远程屏幕——手机查看并触控你的 Mac（需 Mac 端 Alma ≥ 0.4.378）\n\n- 配对后 ⋯ 菜单下方出现显示器入口，全屏查看 Mac 桌面（iOS「Computer」同款）\n- 双通道：JPEG 自适应保底 + WebRTC 高清（顶栏亮 HD）；Mac 未授权 helper 时仅查看\n- 触控：单指点/双击/长按右键/拖动，双指滚动+捏合缩放（1×↔1:1），三指平移\n- 键盘条（粘贴/esc/tab/方向键）+ 输入框（中文 IME）；Mac↔手机剪贴板互通\n- beta 渠道（prerelease）：正式更新通道不受影响",
+  "tag": "v0.4.378-24",
+  "apk": "alma-android-v0.4.378-24.apk",
+  "notes": "beta：远程屏幕——手机查看并触控你的 Mac（需 Mac 端 Alma ≥ 0.4.378）\n\n- 配对后 ⋯ 菜单下方出现显示器入口，全屏查看 Mac 桌面（iOS「Computer」同款）\n- 双通道：JPEG 自适应保底 + WebRTC 高清（顶栏亮 HD）；Mac 未授权 helper 时仅查看\n- 触控：单指点/双击/长按右键/拖动，双指滚动+捏合缩放（1×↔1:1），三指平移\n- 键盘条（粘贴/esc/tab/方向键）+ 输入框（中文 IME）；Mac↔手机剪贴板互通\n- beta 渠道（prerelease）：正式更新通道不受影响；versionCode 24（可覆盖正式版 23）",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-23/alma-android-v0.4.378-23.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-24/alma-android-v0.4.378-24.apk"
   ]
 }
