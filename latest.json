@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-31",
-  "apk": "alma-android-v0.4.378-31.apk",
-  "notes": "beta：连接诊断面板 + E2E 文本帧模式开关\n\n- 左下角新增「诊」按钮：一键查看 中继配置/局域网直连状态/中继可达性/\n  隧道内请求实测，结果可复制\n- 新增文本帧模式开关（诊断面板内）：排查个别机型 WebView 二进制\n  WebSocket 帧异常导致的「已连接但内容加载不出」",
+  "tag": "v0.4.378-32",
+  "apk": "alma-android-v0.4.378-32.apk",
+  "notes": "beta 修复：已连接但内容全空的根本原因\n\n- 修复连接层门面的 binaryType 同步缺陷：此前握手能成功（显示已连接）但\n  所有业务数据帧被静默丢弃（对话/模型/远程屏幕全空）\n- 该缺陷只出现在默认出厂组合（首次使用、无局域网直连缓存时走中继），\n  与 VPN/中继选择无关——此前多轮排查方向均不在此层\n- 新增手机默认组合的端到端回归（数据流通+界面渲染断言）进入发布门槛",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-31/alma-android-v0.4.378-31.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-32/alma-android-v0.4.378-32.apk"
   ]
 }
