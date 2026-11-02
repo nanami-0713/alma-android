@@ -42,7 +42,7 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 command -v gh >/dev/null || { echo "✗ 需要 gh CLI。" >&2; exit 1; }
-for t in cdp-e2e.mjs cdp-drawer.mjs cdp-webview-gate.mjs cdp-pair-nav.mjs cdp-term-keys.mjs; do
+for t in cdp-e2e.mjs cdp-drawer.mjs cdp-webview-gate.mjs cdp-pair-nav.mjs cdp-term-keys.mjs cdp-phone-repro.mjs; do
   [ -f "$TEST_DIR/$t" ] || { echo "✗ 缺少测试 $TEST_DIR/$t（可用 ALMA_TEST_DIR 覆盖路径）。" >&2; exit 1; }
 done
 
@@ -121,7 +121,7 @@ trap cleanup EXIT
 fail=0
 # 套件间清残留 Chrome：cdp-*.mjs 多数 spawn 后不 kill，连环跑会端口互撞
 # （9223 被上一只占着 → 下一只假失败，LESSONS 已记）。逐个跑前先 pkill。
-for t in cdp-webview-gate.mjs cdp-e2e.mjs cdp-drawer.mjs cdp-update.mjs cdp-update-pill.mjs cdp-pair-nav.mjs cdp-term-keys.mjs; do
+for t in cdp-webview-gate.mjs cdp-e2e.mjs cdp-drawer.mjs cdp-update.mjs cdp-update-pill.mjs cdp-pair-nav.mjs cdp-term-keys.mjs cdp-phone-repro.mjs; do
   [ -f "$TEST_DIR/$t" ] || continue
   pkill -f "remote-debugging-port=92" 2>/dev/null && sleep 1
   echo "── $t"

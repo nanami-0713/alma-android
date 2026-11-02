@@ -29,16 +29,89 @@
   }
 
   function fmtCfg() {
-    var origin = cap("alma.ios.e2e.relayOrigin") || "(未配置)";
-    var code = cap("alma.ios.e2e.code") || "";
-    var mode = cap("alma.ios.backendMode") || "?";
-    var text = lsGet("alma.android.e2e.text") === "1" ? "开（文本帧）" : "关（二进制帧）";
-    return [
-      "后端模式: " + mode,
-      "中继: " + origin,
-      "配对码: " + (code ? code.slice(0, 10) + "…（" + code.length + " 字符）" : "(无)"),
-      "文本帧模式: " + text
-    ];
+    // 真机上 Capacitor Preferences 走原生存储（localStorage 只有 web 回退
+    // 的 CapacitorStorage.* 前缀）——优先用 almaIOSConfig 桥（异步）。
+    var api = window.almaIOSConfig;
+    if (api && api.getBackendMode) {
+      return Promise.all([
+        api.getBackendMode().catch(function () { return "?"; }),
+        api.getApiBaseURL ? api.getApiBaseURL().catch(function () { return "?" }) : Promise.resolve("?"),
+        api.getPairingInfo ? api.getPairingInfo().catch(function () { return null; }) : Promise.resolve(null)
+      ]).then(function (r) {
+        var code = "";
+        try {
+          var raw = lsGet("CapacitorStorage.alma.ios.e2e.code");
+          if (raw) code = JSON.parse(raw);
+          if (!code && r[2] && r[2].code) code = String(r[2].code);
+          else if (!code && r[2] && r[2].k) code = String(r[2].k);
+        } catch (e) {}
+        return [
+          "后端模式: " + r[0],
+          "中继: " + (r[1] && r[1] !== "?" ? r[1] : (lsGet("CapacitorStorage.alma.ios.e2e.relayOrigin") || "(未配置)")),
+          "配对码: " + (code ? String(code).slice(0, 10) + "…（" + String(code).length + " 字符）" : "(无)"),
+          "文本帧模式: " + (lsGet("alma.android.e2e.text") === "1" ? "开（仅内层编码，传输层仍二进制）" : "关")
+        ];
+      });
+    }
+    return Promise.resolve([
+      "后端模式: " + (cap("alma.ios.backendMode") || "?"),
+      "中继: " + (cap("alma.ios.e2e.relayOrigin") || "(未配置)"),
+      "配对码: " + ((cap("alma.ios.e2e.code") || "").slice(0, 10) + "…"),
+      "文本帧模式: " + (lsGet("alma.android.e2e.text") === "1" ? "开" : "关")
+    ]);
+  }
+
+  // 二进制 WS 自检：经中继 /echo 回显。握手（文本帧）能通而数据全死时，
+  // 用它判定「二进制 WS 帧是否在手机这一跳被吞/破坏」。
+  function probeEcho(origin) {
+    return new Promise(function (resolve) {
+      var url = origin.replace(/\/+$/, "").replace(/^http/, "ws") + "/echo";
+      var t0 = Date.now();
+      var ws;
+      var sent = new Uint8Array([1, 2, 3, 200, 255, 0, 42]);
+      try { ws = new WebSocket(url); } catch (e) { return resolve("✗ 构造失败: " + e.message); }
+      var textOk = false, binOk = false, opened = false;
+      var timer = setTimeout(function () {
+        try { ws.close(); } catch (e) {}
+        resolve("✗ 超时（open=" + opened + " 文本回显=" + textOk + " 二进制回显=" + binOk + "）— " +
+                (opened && !binOk ? "二进制帧在手机这一跳被吞（代理/VPN/WebView 嫌疑）" : "echo 不可达"));
+      }, 5000);
+      ws.onopen = function () {
+        opened = true;
+        try {
+          ws.send("diag-text");
+          ws.send(sent);
+        } catch (e) {
+          clearTimeout(timer);
+          resolve("✗ 发送即抛: " + e.message);
+        }
+      };
+      ws.onmessage = function (ev) {
+        if (typeof ev.data === "string") {
+          if (ev.data === "diag-text") textOk = true;
+        } else {
+          // 二进制回显：等微任务让 Blob/arraybuffer 就位（我们没设 binaryType，
+          // 默认 Blob —— 一并验证二进制能到达）
+          var d = ev.data;
+          if (d && d.size === sent.length) binOk = true;
+        }
+        if (textOk && binOk) {
+          clearTimeout(timer);
+          try { ws.close(); } catch (e) {}
+          resolve("✓ 文本+二进制回显均正常（" + (Date.now() - t0) + "ms）— 二进制帧在本机路径完好");
+        }
+      };
+      ws.onclose = function () {
+        if (!binOk) {
+          clearTimeout(timer);
+          resolve((textOk ? "△ 仅文本回显，二进制丢失" : "✗ 连接被关闭（open=" + opened + "）") +
+                  " — 二进制 WS 帧在手机这一跳被破坏（关代理/VPN 或换网络验证）");
+        }
+      };
+      ws.onerror = function () {
+        if (!opened) { clearTimeout(timer); resolve("✗ 连接失败 — " + origin + " 不可达（DNS/网络/被墙）"); }
+      };
+    });
   }
 
   function fmtLan() {
@@ -108,29 +181,46 @@
 
   function runChecks() {
     var all = [];
-    all.push("── 配置 ──"); all = all.concat(fmtCfg());
-    all.push("── LAN 直连 ──"); all = all.concat(fmtLan());
-    var origin = cap("alma.ios.e2e.relayOrigin") || "";
-    var doRelay = origin ? probeRelay(origin) : Promise.resolve(origin ? "" : "✗ 未配置中继");
-    var doTunnel = probeTunnel();
-    if (origin) {
-      all.push("── 中继可达性 ──");
-      all.push("…探测中");
+    render(["…读取配置中"]);
+    fmtCfg().then(function (cfgLines) {
+      all = all.concat(cfgLines);
+      all.push("── LAN 直连 ──"); all = all.concat(fmtLan());
+      // 应用连接态（DOM 文案）
+      try {
+        var m = document.body.innerText.match(/已连接到你的 Mac|经中继[^\\n]{0,20}|连接中|无法连接[^\\n]{0,30}/);
+        if (m) all.push("应用连接态: " + m[0]);
+      } catch (e) {}
+      var origin = "";
+      for (var i = 0; i < cfgLines.length; i++) {
+        if (cfgLines[i].indexOf("中继: ") === 0) origin = cfgLines[i].slice(4);
+      }
+      var jobs = [];
+      if (origin && origin.indexOf("(") !== 0) {
+        all.push("── 中继可达性 ──");
+        all.push("…探测中");
+        jobs.push(probeRelay(origin));
+      } else jobs.push(null);
+      if (origin && origin.indexOf("(") !== 0) {
+        all.push("── 二进制 WS 自检（经 /echo） ──");
+        all.push("…回显检测中");
+        jobs.push(probeEcho(origin));
+      } else jobs.push(null);
+      all.push("── 隧道实测 ──");
+      all.push("…请求中");
+      jobs.push(probeTunnel());
       render(all);
-    }
-    all.push("── 隧道实测 ──");
-    all.push("…请求中");
-    render(all);
-    Promise.all([doRelay, doTunnel]).then(function (rs) {
-      // 按序回填（占位行被替换，而不是追加到尾部）
-      var relayIdx = all.indexOf("…探测中");
-      if (relayIdx >= 0) all[relayIdx] = rs[0];
-      var tunIdx = all.indexOf("…请求中");
-      if (tunIdx >= 0) all[tunIdx] = rs[1];
-      all.push("（检测完成，可复制结果）");
-      render(all);
+      Promise.all(jobs).then(function (rs) {
+        var ph = ["…探测中", "…回显检测中", "…请求中"];
+        for (var k = 0; k < ph.length; k++) {
+          var idx = all.indexOf(ph[k]);
+          if (idx >= 0 && rs[k] != null) all[idx] = rs[k];
+          else if (idx >= 0 && rs[k] == null) all.splice(idx, 1);
+        }
+        all.push("（检测完成，可复制结果）");
+        render(all);
+      });
+      ui.last = all;
     });
-    ui.last = all;
   }
 
   function buildPanel() {

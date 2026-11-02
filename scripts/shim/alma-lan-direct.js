@@ -81,10 +81,22 @@
   // 严格模式下赋值会抛 TypeError；这里全部用自有属性。
   function LanDirectSocket(relayUrl) {
     var self = this;
-    this.binaryType = "blob";
     this.readyState = 0;              // CONNECTING
     this.onopen = null; this.onmessage = null; this.onclose = null; this.onerror = null;
-    var inner = null, adopted = false, closedByUser = false;
+    var inner = null, adopted = false, closedByUser = false, _binaryType = "blob";
+    // binaryType 实时同步：客户端在构造之后才设 "arraybuffer"（v0.4.378
+    // chunk 的 connect()），一次性的拷贝会让内层保持 "blob" → 二进制帧以
+    // Blob 送达 → 客户端 string/ArrayBuffer/isView 三分支全不匹配 → 静默
+    // 丢弃 → 「握手绿（文本帧）+ 业务数据零（二进制帧全丢）」。
+    // v0.4.378-31 实机根因。
+    Object.defineProperty(this, "binaryType", {
+      get: function () { return inner ? inner.binaryType : _binaryType; },
+      set: function (v) {
+        _binaryType = v;
+        if (inner) { try { inner.binaryType = v; } catch (e) {} }
+      },
+      configurable: true
+    });
 
     function emit(ev, arg) {
       var h = self["on" + ev];
@@ -96,7 +108,7 @@
       if (adopted || closedByUser) { try { ws.close(); } catch (e) {} return; }
       adopted = true;
       inner = ws;
-      ws.binaryType = self.binaryType;
+      try { ws.binaryType = _binaryType; } catch (e) {}
       ws.onopen = function (e) { self.readyState = 1; emit("open", e); scheduleDiscover(); };
       ws.onmessage = function (e) { emit("message", e); };
       ws.onclose = function (e) { self.readyState = 3; emit("close", e); scheduleDiscover(); };
