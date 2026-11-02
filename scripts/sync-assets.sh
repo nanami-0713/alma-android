@@ -20,7 +20,8 @@ import glob, re, shutil
 for src, dst in [('scripts/shim/alma-droid-shim.js', 'www/alma-droid-shim.js'),
                  ('scripts/shim/alma-webview-gate.js', 'www/alma-webview-gate.js'),
                  ('scripts/shim/alma-local-engine.js', 'www/alma-local-engine.js'),
-                 ('scripts/shim/alma-term-keys.js', 'www/alma-term-keys.js')]:
+                 ('scripts/shim/alma-term-keys.js', 'www/alma-term-keys.js'),
+                 ('scripts/shim/alma-screen-remote.js', 'www/alma-screen-remote.js')]:
     shutil.copyfile(src, dst)
 
 for p in glob.glob('www/*.html'):
@@ -34,6 +35,10 @@ for p in glob.glob('www/*.html'):
            '\n<script src="./alma-droid-shim.js"></script>' + \
            '\n<script src="./alma-local-engine.js"></script>' + \
            '\n<script src="./alma-term-keys.js"></script>'
+    # 远程屏幕（看/控 Mac）：只在主应用入口加载（模块内部另有子帧/页面闸，
+    # 但入口层就限定 index.html 最稳：connected/settings 等页面不引入）
+    if p.endswith('index.html'):
+        tags += '\n<script src="./alma-screen-remote.js"></script>'
     if m:
         s = s[:m.end()] + tags + s[m.end():]
     else:

@@ -52,6 +52,7 @@ alma-android/
 ├── android/                # Capacitor Gradle 工程
 ├── scripts/sync-assets.sh  # 【可选】升级用：新版 renderer → www/ 全流程重建
 ├── scripts/shim/alma-droid-shim.js
+├── scripts/shim/alma-screen-remote.js   # 远程屏幕（看/控 Mac，仅注入 index.html）
 ├── capacitor.config.json   # appId local.almaandroid.app / androidScheme https
 └── package.json
 ```
@@ -82,6 +83,21 @@ alma-android/
 3. 配对成功自动重载 → 完整手机体验（会话列表/生成跑在 Mac 上，经 E2E 加密中继）
 4. 不连 Mac：设置 → 本机模式（beta）→ AI 提供商，配自己的密钥
 **（注：本机模式暂不完善，待后续开发...）**
+
+## 远程屏幕：看 + 触控你的 Mac（beta）
+
+配对后主界面左上 ⋯ 菜单下方出现「显示器」小钮，点开全屏查看器（iOS 端「Computer」同款能力）：
+
+- **看**：Mac 桌面实时流。基础 JPEG 通道（~8fps，任何环境可用），出帧后自动协商 WebRTC H.264 高清通道（更流畅更省流量，顶栏亮 `HD`；协商失败静默留在 JPEG）。
+- **控**（需 Mac 端「Alma Computer Use」helper + 屏幕录制/辅助功能授权，未授权时显示「仅查看」）：
+  - 单指 = 鼠标：轻点点击、双击双击、长按 500ms 右键、按住拖动
+  - 双指 = 滚轮（自然滚动方向）；双指捏合 = 缩放（1× 适合 ↔ 1:1 原生，顶栏切换）
+  - 三指拖动 = 放大后平移视图
+- **键盘条**：粘贴 / esc / tab / 方向键 + 输入框（中文 IME 可用，回车或 ↑ 发送到 Mac）
+- **剪贴板互通**：Mac 复制 → 自动同步到手机；手机复制 → 「粘贴」键打到 Mac（等价 ⌘V）
+- 顶栏显示 `宽 × 高 · 码率 kbit/s`，Android 返回键关闭查看器
+
+技术：`scripts/shim/alma-screen-remote.js`（无构建步骤，随 shim 注入 index.html），协议 = Mac 本地 API 的 `/ws/screen` WebSocket（`pointer/scroll/text/key/clipboard` 上行、`status/frame/viewport/clipboard/rtc_*` 下行），经 E2E 中继隧道透传（sentinel host `alma-e2e.local` 被 connected chunk 的 WebSocket 拦截接管）。要求 Mac 端 Alma ≥ 0.4.378。调试可设 localStorage `alma.android.screen.base`（如 `ws://127.0.0.1:23001`）直连本地 API 验证协议。
 
 **语言**：首启跟随系统语言；设置 → 外观下方可切换 跟随系统 / English / 中文 / 日本語，选择立即生效并持久化。
 
