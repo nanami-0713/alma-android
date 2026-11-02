@@ -33,6 +33,7 @@
   var MODE_KEY = "alma.android.lan.mode";      // "off" = 停用
   var CACHE_KEY = "alma.android.lan.direct";   // {host, port, at}
   var NAME_KEY = "alma.android.lan.hostName";  // herdr 主机名（.local 用）
+  var FAIL_KEY = "alma.android.lan.fails";     // 直连连续 open 失败计数
   var FRESH_MS = 12 * 60 * 60 * 1000;          // 缓存 12h 内视为新鲜
   var DIRECT_PORT = 23019;                     // Mac 直连监听口（0.4.378/392 实测）
   var DIRECT_OPEN_MS = 2500;                   // 直连拨号上限（LAN 通则 <50ms）
@@ -41,7 +42,27 @@
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function disabled() { return lsGet(MODE_KEY) === "off"; }
+  function failCount() { return parseInt(lsGet(FAIL_KEY) || "0", 10) || 0; }
+  function bumpFail() {
+    var n = failCount() + 1;
+    lsSet(FAIL_KEY, String(n));
+    // 连续 2 次「连接都建立不了」（网络不通 / ROM 拦 ws://）：作废缓存并
+    // 冷却 1h——否则每次连接都先在必败的直连上白等再回落，中继再一慢
+    // 就是「已连接但数据出不来」（v0.4.378-29 实机）
+    if (n >= 2) {
+      lsSet(CACHE_KEY, "");
+      lsSet(FAIL_KEY, "0");
+      lsSet(CACHE_KEY + ".cooldown", String(Date.now()));
+      lastResult = { at: Date.now(), giveUp: true, reason: "direct dial failed x" + n };
+    }
+  }
+  function clearFails() { lsSet(FAIL_KEY, "0"); }
+  function inCooldown() {
+    var t = parseInt(lsGet(CACHE_KEY + ".cooldown") || "0", 10) || 0;
+    return t && Date.now() - t < 60 * 60 * 1000;
+  }
   function cached() {
+    if (inCooldown()) return null;
     try {
       var c = JSON.parse(lsGet(CACHE_KEY) || "null");
       if (c && typeof c.host === "string" && c.port > 0 && Date.now() - (c.at || 0) < FRESH_MS) return c;
@@ -50,6 +71,7 @@
   }
   function saveCache(host, port) {
     lsSet(CACHE_KEY, JSON.stringify({ host: host, port: port, at: Date.now() }));
+    lsSet(CACHE_KEY + ".cooldown", "0");
   }
 
   // ── WebSocket 门面：对客户端呈现一个标准 WebSocket ─────────────────
@@ -80,8 +102,7 @@
       ws.onclose = function (e) { self.readyState = 3; emit("close", e); scheduleDiscover(); };
       ws.onerror = function (e) { emit("error", e); };
       if (ws.readyState >= 1) { self.readyState = ws.readyState; emit("open", {}); scheduleDiscover(); }
-    }
-    this.send = function (d) {
+    }    this.send = function (d) {
       if (inner && inner.readyState === 1) inner.send(d);
     };
     this.close = function (code, reason) {
@@ -97,34 +118,65 @@
       var dw;
       try { dw = new RealWS("ws://" + c.host + ":" + c.port + "/__alma_e2e__"); }
       catch (e) { dw = null; }
-      if (!dw) { adopt(new RealWS(relayUrl)); return; }
+      if (!dw) { bumpFail(); adopt(new RealWS(relayUrl)); notifyRoute("relay"); return; }
       var settled = false;
       var timer = setTimeout(function () {
         if (settled) return;
         settled = true;
         try { dw.onopen = dw.onmessage = dw.onclose = dw.onerror = null; dw.close(); } catch (e) {}
-        adopt(new RealWS(relayUrl));
+        bumpFail();
+        adopt(new RealWS(relayUrl)); notifyRoute("relay");
       }, DIRECT_OPEN_MS);
       dw.onopen = function () {
         if (settled) return;
         settled = true; clearTimeout(timer);
+        clearFails();
         adopt(dw);
+        notifyRoute("direct");
       };
       dw.onerror = function () {
         if (settled) return;
         settled = true; clearTimeout(timer);
         try { dw.close(); } catch (e) {}
-        adopt(new RealWS(relayUrl));
+        bumpFail();
+        adopt(new RealWS(relayUrl)); notifyRoute("relay");
       };
       dw.onclose = function () {
         if (settled) return;
         settled = true; clearTimeout(timer);
-        adopt(new RealWS(relayUrl));
+        bumpFail();
+        adopt(new RealWS(relayUrl)); notifyRoute("relay");
       };
       dw.onmessage = null;
     } else {
-      adopt(new RealWS(relayUrl));
+      adopt(new RealWS(relayUrl)); notifyRoute("relay");
     }
+  }
+
+  // ── 路径可见化：直连生效弹一次性 toast；路由记录进调试钩子 ────────
+  var lastRoute = null;
+  var routeNotified = false;
+  function notifyRoute(kind) {
+    lastRoute = { kind: kind, at: Date.now() };
+    if (kind !== "direct" || routeNotified) return;
+    routeNotified = true;
+    try {
+      var lang = "";
+      try { lang = (localStorage.getItem("i18nextLng") || "").toLowerCase(); } catch (e) {}
+      var text = lang.indexOf("zh") === 0 ? "已通过局域网直连你的 Mac"
+        : lang.indexOf("ja") === 0 ? "LAN 経由で直接接続しました"
+        : "Connected to your Mac over LAN";
+      var el = document.createElement("div");
+      el.id = "alma-lan-toast";
+      el.textContent = text;
+      el.style.cssText = "position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);" +
+        "transform:translateX(-50%);z-index:2147482200;background:rgba(28,30,35,.94);color:#e8eaed;" +
+        "font-size:13px;padding:9px 16px;border-radius:9999px;box-shadow:0 4px 16px rgba(0,0,0,.4);" +
+        "pointer-events:none;transition:opacity .4s;";
+      (document.body || document.documentElement).appendChild(el);
+      setTimeout(function () { el.style.opacity = "0"; }, 2600);
+      setTimeout(function () { el.remove(); }, 3100);
+    } catch (e) {}
   }
 
   window.WebSocket = function LanDirectWebSocket(url, protocols) {
@@ -325,11 +377,12 @@
     if (!disabled() && !cached()) discover();
   }, 12000);
 
-  // 现场排查钩子：手动触发发现 / 看缓存与最近一轮发现结果
+  // 现场排查钩子：手动触发发现 / 看缓存、路由与最近一轮发现结果
   window.__almaLanDirect = {
     discover: function () { lastDiscoverAt = 0; if (disabled()) return "off"; discover(); return "running"; },
     cache: function () { try { return JSON.parse(lsGet(CACHE_KEY) || "null"); } catch (e) { return null; } },
+    route: function () { return lastRoute; },
     lastResult: function () { return lastResult; },
-    clear: function () { lsSet(CACHE_KEY, ""); return "cleared"; }
+    clear: function () { lsSet(CACHE_KEY, ""); lsSet(CACHE_KEY + ".cooldown", "0"); lsSet(FAIL_KEY, "0"); return "cleared"; }
   };
 })();
