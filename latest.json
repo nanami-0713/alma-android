@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-30",
-  "apk": "alma-android-v0.4.378-30.apk",
-  "notes": "beta 修复：局域网直连的失败保护与路径显示\n\n- 直连若在真机被系统拦截，两次失败后自动作废并冷却 1 小时（不再每次\n  连接都白等直连再回落中继——「已连接但数据加载不出」的主因）\n- 直连生效时会弹提示「已通过局域网直连你的 Mac」，一眼可辨连接路径\n- 中继路径的业务接口经直连隧道验证毫秒级正常",
+  "tag": "v0.4.378-31",
+  "apk": "alma-android-v0.4.378-31.apk",
+  "notes": "beta：连接诊断面板 + E2E 文本帧模式开关\n\n- 左下角新增「诊」按钮：一键查看 中继配置/局域网直连状态/中继可达性/\n  隧道内请求实测，结果可复制\n- 新增文本帧模式开关（诊断面板内）：排查个别机型 WebView 二进制\n  WebSocket 帧异常导致的「已连接但内容加载不出」",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-30/alma-android-v0.4.378-30.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-31/alma-android-v0.4.378-31.apk"
   ]
 }
