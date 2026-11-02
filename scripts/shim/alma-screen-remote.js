@@ -991,13 +991,35 @@
   function pillShouldShow() {
     return S.e2e === true && !S.open && !settingsLayerOpen() && !rendererOverlayOpen();
   }
+  var pillAnchor = null;   // 滞回：现锚点仍有效就不换（防滚动中重锚乱跳）
+  function inChromeBar(el) {
+    // 锚点必须挂在 fixed/sticky 的顶栏祖先上：会话滚动时消息内容里的按钮
+    // 也会穿过左上区域（几何条件瞬时满足）——没有这个约束 pill 会跟着
+    // 滚动内容乱跳（v0.4.378-33 实机反馈）
+    try {
+      var n = el;
+      while (n && n !== document.body) {
+        var pos = getComputedStyle(n).position;
+        if (pos === "fixed" || pos === "sticky") return true;
+        n = n.parentElement;
+      }
+    } catch (e) {}
+    return false;
+  }
+  function anchorOk(b) {
+    if (!b || !b.isConnected) return false;
+    var r = b.getBoundingClientRect();
+    return r.width >= 20 && r.width <= 60 && r.left > -10 && r.left < 60
+        && r.top > -10 && r.top < 60 && !!b.querySelector("svg");
+  }
   function findMenuToggle() {
+    if (anchorOk(pillAnchor)) return pillAnchor;
+    pillAnchor = null;
     try {
       var btns = document.querySelectorAll("button");
       for (var i = 0; i < btns.length; i++) {
-        var r = btns[i].getBoundingClientRect();
-        if (r.width >= 20 && r.width <= 60 && r.left > -10 && r.left < 60
-            && r.top > -10 && r.top < 60 && btns[i].querySelector("svg")) return btns[i];
+        if (!inChromeBar(btns[i])) continue;
+        if (anchorOk(btns[i])) { pillAnchor = btns[i]; return btns[i]; }
       }
     } catch (e) {}
     return null;

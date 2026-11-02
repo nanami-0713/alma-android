@@ -12,10 +12,13 @@
   if (typeof window === "undefined") return;
   var isSubframe = false;
   try { isSubframe = window.parent && window.parent !== window; } catch (e) {}
-  if (isSubframe) return;
   var page = "";
   try { page = location.pathname.split("/").pop() || ""; } catch (e) {}
-  if (page && !/^index\.html?$/i.test(page)) return;
+  // 主帧（index）＝设置行注入方；设置 iframe（settings.html）＝诊断面板
+  // 渲染地（-33 实机反馈：面板画在主帧被设置层盖住，还得退出设置才能看）
+  var isSettingsFrame = isSubframe && /^settings\.html?$/i.test(page);
+  if (isSubframe && !isSettingsFrame) return;
+  if (!isSubframe && page && !/^index\.html?$/i.test(page)) return;
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function cap(k) { try { return localStorage.getItem("CapacitorStorage." + k); } catch (e) { return null; } }
@@ -116,6 +119,9 @@
 
   function fmtLan() {
     var h = window.__almaLanDirect;
+    if (!h && isSettingsFrame) {
+      try { h = window.parent && window.parent.__almaLanDirect; } catch (e) {}
+    }
     if (!h) return ["LAN 直连模块: 未加载"];
     var lines = ["LAN 直连模块: 已加载"];
     try {
@@ -255,7 +261,14 @@
         var on = lsGet("alma.android.e2e.text") === "1";
         try { localStorage.setItem("alma.android.e2e.text", on ? "0" : "1"); } catch (e) {}
         toast(on ? "已切回二进制帧，正在重载…" : "已切换文本帧模式，正在重载…");
-        setTimeout(function () { location.reload(); }, 600);
+        // E2E 客户端在主帧：设置帧里切换要请主帧整页重载（同 localStorage）
+        setTimeout(function () {
+          if (isSettingsFrame) {
+            try { window.parent.postMessage({ type: "alma-android-reload-main" }, "*"); } catch (e) { location.reload(); }
+          } else {
+            location.reload();
+          }
+        }, 600);
       }
     });
     var toastEl = document.createElement("div");
@@ -270,7 +283,17 @@
     runChecks();
   }
 
-  // ── 入口：设置页「连接诊断」行（克隆「我的 Mac」行，样式零偏差）────
+  // ── 入口分帧 ────────────────────────────────────────────────────────
+  if (isSettingsFrame) {
+    // 设置帧：面板在此渲染（盖在设置内容之上）。主帧注入的行点击 →
+    // postMessage 过来。文本帧切换需要主帧的 E2E 客户端重建 → 请主帧重载。
+    window.addEventListener("message", function (e) {
+      if (e && e.data && e.data.type === "alma-open-diag") buildPanel();
+    });
+    // 兜底：外部直接调用（同文档场景）
+    window.__almaDiagOpen = buildPanel;
+  }
+  // ── 主帧侧：设置页「连接诊断」行（克隆「我的 Mac」行，样式零偏差）────
   // 主帧同源操作设置 iframe；500ms 轮询注入（React 重渲染吞掉后会重新补上）。
   // 点击 → postMessage 到主帧开面板（面板逻辑跑在主帧，apiServer/桥都在）。
   var DIAG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2.5-6 4 12 2.5-6h3.5"/><path d="M19 9h3"/></svg>';
@@ -306,32 +329,32 @@
       holder.innerHTML = DIAG_SVG;
     }
     row.addEventListener("click", function () {
-      try { window.postMessage({ type: "alma-open-diag" }, "*"); } catch (e) {}
+      try { f.contentWindow.postMessage({ type: "alma-open-diag" }, "*"); } catch (e) {}
       try { if (window.haptics && window.haptics.tick) window.haptics.tick(); } catch (e) {}
     });
     mac.parentNode.insertBefore(row, mac.nextSibling);
   }
-  setInterval(injectSettingsRow, 400);
+  if (!isSettingsFrame) setInterval(injectSettingsRow, 400);
   // 设置层一开就注入（iframe 首次渲染完成后 React 树才稳定，400/1200ms
   // 双保险 + 轮询兜底——重渲染吞掉也会补回）
   try {
-    var origOpen = window.settingsWindow && window.settingsWindow.open;
+    var origOpen = !isSettingsFrame && window.settingsWindow && window.settingsWindow.open;
     if (origOpen) {
       window.settingsWindow.open = function () {
         var r = origOpen.apply(this, arguments);
-        setTimeout(injectSettingsRow, 400);
-        setTimeout(injectSettingsRow, 1200);
+        // 设置页 React 渲染完成点不定（还要过桥拉配置）——多点位补触发 +
+        // 轮询兜底（React 重渲染吞掉也会补回）
+        [300, 700, 1200, 2000, 3000].forEach(function (ms) {
+          setTimeout(injectSettingsRow, ms);
+        });
         return r;
       };
     }
   } catch (e) {}
   // 调试口：手动触发注入（排障用）
-  window.__almaDiagInject = injectSettingsRow;
+  if (!isSettingsFrame) window.__almaDiagInject = injectSettingsRow;
 
-  // 主帧：设置行发来的开面板消息
-  window.addEventListener("message", function (e) {
-    if (e && e.data && e.data.type === "alma-open-diag") buildPanel();
-  });
+
 
   // 样式（面板本体；入口在设置页里克隆 renderer 自己的行，无需额外样式）
   try {

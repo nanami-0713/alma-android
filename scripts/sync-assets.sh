@@ -42,6 +42,9 @@ for p in glob.glob('www/*.html'):
     # 但入口层就限定 index.html 最稳：connected/settings 等页面不引入）
     if p.endswith('index.html'):
         tags += '\n<script src="./alma-screen-remote.js"></script>'
+    # 连接诊断：index（设置行注入方）+ settings（面板渲染地）——模块自分行
+    if p.endswith('index.html') or p.endswith('settings.html'):
+        tags += '\n<script src="./alma-diag.js"></script>'
     if m:
         s = s[:m.end()] + tags + s[m.end():]
     else:
