@@ -104,11 +104,11 @@ alma-android/
 `scripts/shim/alma-lan-direct.js`（注入在所有 chunk 之前）：Mac 端 Alma 在全网卡监听 `/__alma_e2e__`（实测 :23019），与中继路径完全同构（同一 E2ESession + connectCode）。手机侧在 connected chunk 捕获 `window.WebSocket` 前装好包装器：
 
 - **拨号**：有新鲜直连缓存（12h）→ 先拨 `ws://<host>:<port>/__alma_e2e__`（LAN 上 <50ms），2.5s 内未通立即回落中继（routing token 是 code 的确定派生，可复用）
-- **发现**（隧道就绪后 / 启动 12s 后台补课）：herdr 主机名 `.local`（mDNS）优先，其次 RTC host 候选举本机私网 IP 做 /24 探扫（P-256 假 hi，收到 hi 即命中；蜂窝网闸停）
-- **中继完全断时也能自救**：无需先经中继建立一次——网段发现独立于隧道
+- **发现**（隧道就绪后 / 拨号失败 / 启动 12s 后台补课）：herdr 主机名 `.local`（mDNS）优先；RTC host 候选**默认被 mDNS 混淆**（Chromium 隐私策略，srflx raddr 也清零——WebView 拿不到本机私网 IP），故主路径是**网关探测**：no-cors fetch 常见家用网段的 `.1`（路由器管理页必开），活的网段再做 /24 假 hi 探扫（真 P-256 密钥对，0.4.39x 桌面端为 P-256；随机 32B 会被秒断）
+- **中继完全断时也能自救**：无需先经中继建立一次——网关探测独立于隧道
 - E2E 加密在应用层（P-256 ECDH + HKDF + AES-GCM），直连走 ws:// 明文传输与桌面版直连一致，无安全降级；为此 `capacitor.config.json` 开 `allowMixedContent`
-- 实测黑洞中继（10.255.255.1）下直连隧道全通（herdr info / 会话 / 远程屏幕）
-- 调试：`window.__almaLanDirect`（discover/cache/clear）；localStorage `alma.android.lan.mode='off'` 整体停用
+- 实测黑洞中继（10.255.255.1）下：无缓存无主机名冷启动 → 网关探测找到网段 → 扫描命中 → 缓存 → 下一次拨号直连建立（「已连接到你的 Mac」）
+- 调试：`window.__almaLanDirect`（discover/cache/lastResult/clear）；localStorage `alma.android.lan.mode='off'` 整体停用
 
 > 注：0.4.39x 桌面端 E2E 已从 X25519（0.4.213）改为 **P-256**；relay-kit 的 client 尚未跟进，跨版本联调时留意。
 

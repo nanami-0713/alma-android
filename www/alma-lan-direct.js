@@ -77,7 +77,7 @@
       ws.binaryType = self.binaryType;
       ws.onopen = function (e) { self.readyState = 1; emit("open", e); scheduleDiscover(); };
       ws.onmessage = function (e) { emit("message", e); };
-      ws.onclose = function (e) { self.readyState = 3; emit("close", e); };
+      ws.onclose = function (e) { self.readyState = 3; emit("close", e); scheduleDiscover(); };
       ws.onerror = function (e) { emit("error", e); };
       if (ws.readyState >= 1) { self.readyState = ws.readyState; emit("open", {}); scheduleDiscover(); }
     }
@@ -198,6 +198,9 @@
 
   function phonePrivateIPs() {
     return new Promise(function (resolve) {
+      // 注意：Chromium 默认用 mDNS 混淆 host 候选（xxx.local），srflx 的
+      // raddr 也被清零 —— WebView 里通常拿不到本机私网 IP（实测）。此路径
+      // 只对未混淆的 WebView 生效；拿不到时靠 gatewaySubnets() 找网段。
       // 蜂窝网下 10.x 是运营商 NAT，扫它只有噪声 —— 能识别就跳过
       try {
         var conn = navigator.connection || {};
@@ -211,7 +214,6 @@
         pc.onicecandidate = function (e) {
           if (!e.candidate) { pc.close(); resolve(out); return; }
           var c = e.candidate.candidate || "";
-          // "candidate:... udp IP PORT typ host"（host 候选才带本机私网 IP）
           var parts = c.split(" ");
           if (parts.length > 4 && parts[7] === "host") {
             var ip = parts[4];
@@ -224,25 +226,62 @@
     });
   }
 
+  // 网关探测：RTC 拿不到本机 IP 时的网段发现。家用路由器 100% 开着管理页，
+  // no-cors fetch 对「存在的主机」会 resolve（opaque），对不存在网段里的
+  // 地址是 network error —— 探测候选网段的 .1 即可确定手机所在网段。
+  var COMMON_SUBNETS = ["192.168.1", "192.168.0", "192.168.2", "192.168.3", "192.168.4",
+    "192.168.5", "192.168.8", "192.168.10", "192.168.16", "192.168.20", "192.168.31",
+    "192.168.50", "192.168.56", "192.168.100", "192.168.101", "192.168.102", "192.168.123",
+    "192.168.177", "192.168.178", "192.168.192", "10.0.0", "10.0.1", "172.16.0"];
+  function hostAlive(url) {
+    return new Promise(function (resolve) {
+      var ac = (window.AbortController ? new AbortController() : null);
+      var t = setTimeout(function () { if (ac) ac.abort(); resolve(false); }, 1100);
+      fetch(url, { mode: "no-cors", signal: ac ? ac.signal : undefined, cache: "no-store" })
+        .then(function () { clearTimeout(t); resolve(true); },
+              function () { clearTimeout(t); resolve(false); });
+    });
+  }
+  function gatewaySubnets() {
+    return new Promise(function (resolve) {
+      var alive = [];
+      var pend = COMMON_SUBNETS.length;
+      COMMON_SUBNETS.forEach(function (base) {
+        hostAlive("http://" + base + ".1/").then(function (ok) {
+          if (ok) alive.push(base);
+          if (--pend === 0) resolve(alive);
+        });
+      });
+      setTimeout(function () { resolve(alive); }, 2500);   // 兜底返回
+    });
+  }
+
   async function discover() {
     if (disabled() || cached()) return;
     var port = DIRECT_PORT;
     var cands = [];
+    var sources = [];
     // ① herdr 主机名（上次会话缓存）→ <name>.local（mDNS）
     var name = lsGet(NAME_KEY);
-    if (name) cands.push(name.replace(/\.local$/, "") + ".local");
-    // ② 本机私网 IP → /24 邻居（扫描放最后，批量小超时）
+    if (name) { cands.push(name.replace(/\.local$/, "") + ".local"); sources.push("mdns"); }
+    // ② 本机私网 IP（RTC 未混淆时才有）→ /24 邻居
     var ips = await phonePrivateIPs();
-    for (var i = 0; i < ips.length && i < 2; i++) {
-      var base = ips[i].replace(/\.\d+$/, "");
-      for (var h = 1; h <= 254; h++) cands.push(base + "." + h);
+    var subnets = [];
+    for (var i = 0; i < ips.length && i < 2; i++) subnets.push(ips[i].replace(/\.\d+$/, ""));
+    // ③ 网关探测找网段（RTC 混淆时的主路径）
+    if (subnets.length === 0) {
+      var gw = await gatewaySubnets();
+      for (var g = 0; g < gw.length && g < 2; g++) subnets.push(gw[g]);
     }
-    // 串批：.local 先试（一次），网段分批 32 并发
+    for (var s2 = 0; s2 < subnets.length; s2++) {
+      for (var h = 1; h <= 254; h++) cands.push(subnets[s2] + "." + h);
+    }
+    // 串批：.local 先试（一次），网段分批并发
     var hit = null;
     if (cands.length && cands[0].endsWith(".local")) {
       hit = await probe(cands.shift(), port, 1500);
     }
-    var BATCH = 32;
+    var BATCH = 48;
     for (var s = 0; !hit && s < cands.length; s += BATCH) {
       var batch = cands.slice(s, s + BATCH);
       var results = await Promise.all(batch.map(function (h) { return probe(h, port, 1400); }));
@@ -250,8 +289,10 @@
         if (results[r]) { hit = results[r]; break; }
       }
     }
+    lastResult = { at: Date.now(), subnets: subnets, hit: hit, port: port };
     if (hit) saveCache(hit, port);
   }
+  var lastResult = null;
 
   // 隧道就绪后顺手刷新 herdr 主机名（供 .local 候选）：拿到即停，
   // 每 5 分钟最多试一次，不与正常流量抢带宽
@@ -284,10 +325,11 @@
     if (!disabled() && !cached()) discover();
   }, 12000);
 
-  // 现场排查钩子：手动触发发现 / 看缓存
+  // 现场排查钩子：手动触发发现 / 看缓存与最近一轮发现结果
   window.__almaLanDirect = {
     discover: function () { lastDiscoverAt = 0; if (disabled()) return "off"; discover(); return "running"; },
     cache: function () { try { return JSON.parse(lsGet(CACHE_KEY) || "null"); } catch (e) { return null; } },
+    lastResult: function () { return lastResult; },
     clear: function () { lsSet(CACHE_KEY, ""); return "cleared"; }
   };
 })();
