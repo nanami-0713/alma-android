@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-25",
-  "apk": "alma-android-v0.4.378-25.apk",
-  "notes": "beta 修复：远程屏幕实机反馈三则\n\n- 拉开侧边栏（抽屉/设置层/弹窗）时显示器入口不再浮在上面\n- 输入框为空时按回车/发送 = 电脑的回车键（终端场景）\n- 显示器入口图标与左上菜单图标左缘精确对齐",
+  "tag": "v0.4.378-26",
+  "apk": "alma-android-v0.4.378-26.apk",
+  "notes": "beta：触控与延迟优化\n\n- 双指滚动事件合并（30Hz），消除偶发高延迟（小消息灌中继 + Mac 端队列雪崩）\n- 输入改走 WebRTC 数据通道（直连时往返更低）；视频 jitter buffer 压到最低\n- JPEG 帧解码提速（离屏 bitmap → canvas）\n- 三指平移：跟手性重写（全指质心 + 抬指换基点不跳变）+ 松手惯性滑行；\n  落第三指不再误触 Mac 滚轮",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-25/alma-android-v0.4.378-25.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-26/alma-android-v0.4.378-26.apk"
   ]
 }
