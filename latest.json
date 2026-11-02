@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-34",
-  "apk": "alma-android-v0.4.378-34.apk",
-  "notes": "beta：入口稳定性收尾\n\n- 远程屏幕入口固定锚在顶栏：会话内滚动不再跳动\n- 诊断面板直接在设置层内弹出，无需退出设置查看结果",
+  "tag": "v0.4.378-35",
+  "apk": "alma-android-v0.4.378-35.apk",
+  "notes": "Alma Android v0.4.378-35（稳定版）\n\n本系列更新（自 v0.4.378 起）：\n- 远程屏幕：手机全屏查看并触控 Mac（JPEG/WebRTC 双通道、手势、键盘条、\n  剪贴板互通、拖动视图模式）\n- E2E 隧道局域网直连优先（中继劣化时的自救 + 毫秒级连接），失败自动回落\n- 连接诊断：设置页一键检测中继可达性/隧道实测/二进制帧自检\n- 连接层关键修复：E2E 门面 binaryType 同步（已连接但零内容事故）\n- 键盘体验：空输入框编辑键直通电脑、⌫ 连发、中文 IME\n- 入口与观感：诊断入口入设置页、远程屏幕入口顶栏固定锚、抽屉动画首帧隐藏",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-34/alma-android-v0.4.378-34.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-35/alma-android-v0.4.378-35.apk"
   ]
 }
