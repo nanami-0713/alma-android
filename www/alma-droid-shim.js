@@ -357,6 +357,10 @@
     // 「配对页侧滑」直接踹出应用（第二次返回键 = 退出 App），层级必须在这里补全。
     window.__almaAndroidBack = function () {
       try { if (closeUpdateDialog()) return true; } catch (e) {}
+      // 远程屏幕查看器（alma-screen-remote.js）：最顶层覆盖层，最先消化
+      try {
+        if (window.__almaScreenRemote && window.__almaScreenRemote.handleBack()) return true;
+      } catch (e) {}
       var f = settingsFrame();
       if (f && f.style.display !== "none") {
         if (settingsInternalBack(f)) return true;

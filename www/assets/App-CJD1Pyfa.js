@@ -6857,7 +6857,34 @@ function PhoneComposer(props) {
         /* @__PURE__ */ jsxRuntimeExports.jsx("input", { ref: cameraInputRef, type: "file", accept: "image/*", capture: "environment", hidden: true, onChange: (e) => void onInputFiles(e) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("input", { ref: fileInputRef, type: "file", accept: FILE_ACCEPT, multiple: true, hidden: true, onChange: (e) => void onInputFiles(e) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(PhoneActionSheet, { open: attachOpen, onClose: () => setAttachOpen(false), actions: attachActions }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(PhoneActionSheet, { open: effortOpen, onClose: () => setEffortOpen(false), title: t("phone.composer.thinking", "Thinking"), actions: effortActions }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(PhoneSheet, { open: effortOpen, onClose: () => setEffortOpen(false), title: t("phone.composer.thinking", "Thinking"), height: "auto", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 pb-6 pt-1", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "overflow-hidden rounded-2xl bg-muted/40", children: efforts.map((e, i) => {
+            const active = reasoningEffort === e;
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                onClick: () => {
+                  void window.almaHaptics?.selection();
+                  onReasoningEffortChange(e);
+                  setEffortOpen(false);
+                },
+                className: cn(
+                  "flex min-h-[50px] w-full items-center gap-3 px-4 py-2.5 text-left active:bg-muted",
+                  i > 0 && "border-t border-border/50"
+                ),
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "flex min-w-0 flex-1 flex-col text-left", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: cn("truncate text-[16px] leading-6", active && "font-medium"), children: e === "off" ? t("phone.composer.thinkingOff", "Off") : EFFORT_LABEL[e] }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "truncate text-[13px] leading-5 text-muted-foreground", children: t("reasoning.effortDesc." + e, "") })
+                  ] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "flex h-5 w-5 shrink-0 items-center justify-center text-primary", children: active ? /* @__PURE__ */ jsxRuntimeExports.jsx(Check, { size: 18, strokeWidth: 2.5 }) : null })
+                ]
+              },
+              e
+            );
+          }) }) })
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(PhoneSheet, { open: modelOpen, onClose: () => setModelOpen(false), title: t("phone.composer.model", "Model"), height: "78dvh", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 pb-2 pt-1", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex h-10 items-center gap-2 rounded-[12px] bg-muted px-3 text-[16px]", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(Search$1, { size: 17, className: "shrink-0 text-muted-foreground" }),

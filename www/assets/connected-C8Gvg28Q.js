@@ -937,7 +937,7 @@ class E2ESession {
     this.onReady = opts.onReady;
     this.onFrame = opts.onFrame;
     this.onError = opts.onError;
-    this.offerBinary = opts.binaryFrames ?? true;
+    this.offerBinary = opts.binaryFrames ?? (function(){ try { return localStorage.getItem("alma.android.e2e.text") !== "1"; } catch (e) { return true; } })();
     this.offerStreamed = opts.streamedBodies ?? false;
   }
   /** Initiator only: kick off the handshake once the socket is open. */

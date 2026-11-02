@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378",
-  "apk": "alma-android-v0.4.378.apk",
-  "notes": "Alma Android 0.4.378（renderer 0.4.378）。\n- LESSONS 记 0.4.378 同步轮",
+  "tag": "v0.4.378-34",
+  "apk": "alma-android-v0.4.378-34.apk",
+  "notes": "beta：入口稳定性收尾\n\n- 远程屏幕入口固定锚在顶栏：会话内滚动不再跳动\n- 诊断面板直接在设置层内弹出，无需退出设置查看结果",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378/alma-android-v0.4.378.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-34/alma-android-v0.4.378-34.apk"
   ]
 }

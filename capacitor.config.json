@@ -3,7 +3,7 @@
   "appName": "Alma",
   "webDir": "www",
   "android": {
-    "allowMixedContent": false,
+    "allowMixedContent": true,
     "adjustMarginsForEdgeToEdge": "force"
   },
   "server": {

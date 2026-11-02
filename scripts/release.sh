@@ -6,6 +6,11 @@
 #   版本号缺省 = 当前 versionName 的 patch 位 +1（1.3.0 → 1.3.1）
 #   发布说明缺省 = "Alma Android v<版本>。"
 #
+# beta 渠道：bash scripts/release.sh --beta [版本号] [发布说明]
+#   commit/tag 推 beta 分支（不动 main），GitHub Release 标 prerelease ——
+#   releases/latest API 跳过 prerelease，正式通道用户不会收到 beta 更新提示；
+#   latest.json 只随 beta 提交，main 的镜像兜底源保持正式版。
+#
 # 前置：HEAD 干净（www/ 与 android/ 已提交）；test 三件套全绿才会走到 commit
 # （对应「端到端测试和回归测试通过之前不许提交」的项目规则）。
 set -euo pipefail
@@ -20,13 +25,24 @@ export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/
 
 cd "$ROOT"
 
-# ── 0. 前置检查 ─────────────────────────────────────────────────────
+# ── 0. beta 渠道参数（--beta 必须是第一个参数）───────────────────────
+BETA=0
+if [ "${1:-}" = "--beta" ]; then BETA=1; shift; fi
+BRANCH=main
+PRERELEASE=()
+if [ "$BETA" = 1 ]; then
+  BRANCH=beta
+  PRERELEASE=(--prerelease)
+  echo "▶ beta 渠道：推 origin/beta + prerelease（main 更新通道不受影响）"
+fi
+
+# ── 前置检查 ─────────────────────────────────────────────────────
 if [ -n "$(git status --porcelain)" ]; then
   echo "✗ 工作区有未提交改动；先提交或 stash 再发布。" >&2
   exit 1
 fi
 command -v gh >/dev/null || { echo "✗ 需要 gh CLI。" >&2; exit 1; }
-for t in cdp-e2e.mjs cdp-drawer.mjs cdp-webview-gate.mjs cdp-pair-nav.mjs cdp-term-keys.mjs; do
+for t in cdp-e2e.mjs cdp-drawer.mjs cdp-webview-gate.mjs cdp-pair-nav.mjs cdp-term-keys.mjs cdp-phone-repro.mjs; do
   [ -f "$TEST_DIR/$t" ] || { echo "✗ 缺少测试 $TEST_DIR/$t（可用 ALMA_TEST_DIR 覆盖路径）。" >&2; exit 1; }
 done
 
@@ -105,7 +121,7 @@ trap cleanup EXIT
 fail=0
 # 套件间清残留 Chrome：cdp-*.mjs 多数 spawn 后不 kill，连环跑会端口互撞
 # （9223 被上一只占着 → 下一只假失败，LESSONS 已记）。逐个跑前先 pkill。
-for t in cdp-webview-gate.mjs cdp-e2e.mjs cdp-drawer.mjs cdp-update.mjs cdp-update-pill.mjs cdp-pair-nav.mjs cdp-term-keys.mjs; do
+for t in cdp-webview-gate.mjs cdp-e2e.mjs cdp-drawer.mjs cdp-update.mjs cdp-update-pill.mjs cdp-pair-nav.mjs cdp-term-keys.mjs cdp-phone-repro.mjs; do
   [ -f "$TEST_DIR/$t" ] || continue
   pkill -f "remote-debugging-port=92" 2>/dev/null && sleep 1
   echo "── $t"
@@ -148,13 +164,15 @@ git commit -m "release: $TAG (versionCode $NEW_CODE)
 
 $NOTES"
 git tag "$TAG"
-git push origin main
+git push origin "$BRANCH"
 git push origin "$TAG"
 
 # ── 6. GitHub Release（附 APK 资产；应用内检查即读它）──────────────
+# beta 渠道带 --prerelease：不进 releases/latest，正式通道用户不可见
 gh release create "$TAG" "/tmp/$ASSET#$ASSET" \
   --repo nanami-0713/alma-android \
   --title "Alma Android $TAG" \
+  ${PRERELEASE[@]+"${PRERELEASE[@]}"} \
   --notes "$NOTES"
 
-echo "✓ 发布完成：${TAG}（资产 ${ASSET}，latest.json 已随 main 推送）"
+echo "✓ 发布完成：${TAG}（资产 ${ASSET}，latest.json 已随 ${BRANCH} 推送）"
