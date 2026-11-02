@@ -19,6 +19,7 @@ python3 - << 'PYEOF'
 import glob, re, shutil
 for src, dst in [('scripts/shim/alma-droid-shim.js', 'www/alma-droid-shim.js'),
                  ('scripts/shim/alma-webview-gate.js', 'www/alma-webview-gate.js'),
+                 ('scripts/shim/alma-lan-direct.js', 'www/alma-lan-direct.js'),
                  ('scripts/shim/alma-local-engine.js', 'www/alma-local-engine.js'),
                  ('scripts/shim/alma-term-keys.js', 'www/alma-term-keys.js'),
                  ('scripts/shim/alma-screen-remote.js', 'www/alma-screen-remote.js')]:
@@ -32,6 +33,7 @@ for p in glob.glob('www/*.html'):
     s = re.sub(r'<script>\s*// alma-android: 平台桥.*?</script>\n?', '', s, flags=re.S)
     m = re.search(r'<body[^>]*>', s)
     tags = '\n<script src="./alma-webview-gate.js"></script>' + \
+           '\n<script src="./alma-lan-direct.js"></script>' + \
            '\n<script src="./alma-droid-shim.js"></script>' + \
            '\n<script src="./alma-local-engine.js"></script>' + \
            '\n<script src="./alma-term-keys.js"></script>'

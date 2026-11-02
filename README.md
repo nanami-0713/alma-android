@@ -99,6 +99,19 @@ alma-android/
 
 技术：`scripts/shim/alma-screen-remote.js`（无构建步骤，随 shim 注入 index.html），协议 = Mac 本地 API 的 `/ws/screen` WebSocket（`pointer/scroll/text/key/clipboard` 上行、`status/frame/viewport/clipboard/rtc_*` 下行），经 E2E 中继隧道透传（sentinel host `alma-e2e.local` 被 connected chunk 的 WebSocket 拦截接管）。要求 Mac 端 Alma ≥ 0.4.378。调试可设 localStorage `alma.android.screen.base`（如 `ws://127.0.0.1:23001`）直连本地 API 验证协议。
 
+## 局域网直连（E2E 隧道直连优先）
+
+`scripts/shim/alma-lan-direct.js`（注入在所有 chunk 之前）：Mac 端 Alma 在全网卡监听 `/__alma_e2e__`（实测 :23019），与中继路径完全同构（同一 E2ESession + connectCode）。手机侧在 connected chunk 捕获 `window.WebSocket` 前装好包装器：
+
+- **拨号**：有新鲜直连缓存（12h）→ 先拨 `ws://<host>:<port>/__alma_e2e__`（LAN 上 <50ms），2.5s 内未通立即回落中继（routing token 是 code 的确定派生，可复用）
+- **发现**（隧道就绪后 / 启动 12s 后台补课）：herdr 主机名 `.local`（mDNS）优先，其次 RTC host 候选举本机私网 IP 做 /24 探扫（P-256 假 hi，收到 hi 即命中；蜂窝网闸停）
+- **中继完全断时也能自救**：无需先经中继建立一次——网段发现独立于隧道
+- E2E 加密在应用层（P-256 ECDH + HKDF + AES-GCM），直连走 ws:// 明文传输与桌面版直连一致，无安全降级；为此 `capacitor.config.json` 开 `allowMixedContent`
+- 实测黑洞中继（10.255.255.1）下直连隧道全通（herdr info / 会话 / 远程屏幕）
+- 调试：`window.__almaLanDirect`（discover/cache/clear）；localStorage `alma.android.lan.mode='off'` 整体停用
+
+> 注：0.4.39x 桌面端 E2E 已从 X25519（0.4.213）改为 **P-256**；relay-kit 的 client 尚未跟进，跨版本联调时留意。
+
 **语言**：首启跟随系统语言；设置 → 外观下方可切换 跟随系统 / English / 中文 / 日本語，选择立即生效并持久化。
 
 ## 应用内更新（自动检查 + 手动安装）
