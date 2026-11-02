@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-27",
-  "apk": "alma-android-v0.4.378-27.apk",
-  "notes": "beta：拖动视图模式 + 空框按键直通电脑\n\n- 放大后顶栏出现「拖动视图」开关：单指平移画面（带惯性），不再依赖常被\n  ROM 抢走的三指手势；轻点不会误触 Mac\n- 输入框为空时：退格/delete/方向键/tab/esc 与回车一样直接作用于电脑\n  —— 终端里打错的字能删了\n- 按键条新增 ⌫（长按连发）",
+  "tag": "v0.4.378-28",
+  "apk": "alma-android-v0.4.378-28.apk",
+  "notes": "思考强度菜单统一为模型选择同款底部弹层（拖拽把手+标题+卡片列表+每档说明文字）；E2E 隧道局域网直连优先，绕开劣化的 relay.alma.now（来自并行会话）",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-27/alma-android-v0.4.378-27.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-28/alma-android-v0.4.378-28.apk"
   ]
 }
