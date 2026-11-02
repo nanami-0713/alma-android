@@ -270,7 +270,70 @@
     runChecks();
   }
 
-  // 样式 + 入口钮
+  // ── 入口：设置页「连接诊断」行（克隆「我的 Mac」行，样式零偏差）────
+  // 主帧同源操作设置 iframe；500ms 轮询注入（React 重渲染吞掉后会重新补上）。
+  // 点击 → postMessage 到主帧开面板（面板逻辑跑在主帧，apiServer/桥都在）。
+  var DIAG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2.5-6 4 12 2.5-6h3.5"/><path d="M19 9h3"/></svg>';
+  function injectSettingsRow() {
+    var f = document.getElementById("alma-settings-frame");
+    if (!f || f.style.display === "none") return;
+    var d = f.contentDocument;
+    if (!d || !d.querySelectorAll) return;
+    if (d.getElementById("alma-diag-row")) return;
+    var btns = Array.prototype.slice.call(d.querySelectorAll("button"));
+    var mac = null;
+    for (var i = 0; i < btns.length; i++) {
+      if (/我的 Mac|Your Mac/.test(btns[i].textContent || "")) { mac = btns[i]; break; }
+    }
+    if (!mac || !mac.parentNode) return;
+    var row = mac.cloneNode(true);
+    row.id = "alma-diag-row";
+    row.removeAttribute("disabled");
+    var spans = row.querySelectorAll("span");
+    for (var k = 0; k < spans.length; k++) {
+      var s = spans[k];
+      if (s.querySelector("svg")) continue;              // 图标容器：换图形
+      var t = (s.textContent || "").trim();
+      if (t.indexOf("我的 Mac") > -1 || t.indexOf("Your Mac") > -1) {
+        s.textContent = (s.textContent || "").replace(/我的 Mac|Your Mac/, "连接诊断");
+      } else if (t) {
+        s.remove();                                       // 状态徽标（未连接/版本…）
+      }
+    }
+    var iconBox = row.querySelector("span svg");
+    if (iconBox && iconBox.parentNode) {
+      var holder = iconBox.parentNode;
+      holder.innerHTML = DIAG_SVG;
+    }
+    row.addEventListener("click", function () {
+      try { window.postMessage({ type: "alma-open-diag" }, "*"); } catch (e) {}
+      try { if (window.haptics && window.haptics.tick) window.haptics.tick(); } catch (e) {}
+    });
+    mac.parentNode.insertBefore(row, mac.nextSibling);
+  }
+  setInterval(injectSettingsRow, 400);
+  // 设置层一开就注入（iframe 首次渲染完成后 React 树才稳定，400/1200ms
+  // 双保险 + 轮询兜底——重渲染吞掉也会补回）
+  try {
+    var origOpen = window.settingsWindow && window.settingsWindow.open;
+    if (origOpen) {
+      window.settingsWindow.open = function () {
+        var r = origOpen.apply(this, arguments);
+        setTimeout(injectSettingsRow, 400);
+        setTimeout(injectSettingsRow, 1200);
+        return r;
+      };
+    }
+  } catch (e) {}
+  // 调试口：手动触发注入（排障用）
+  window.__almaDiagInject = injectSettingsRow;
+
+  // 主帧：设置行发来的开面板消息
+  window.addEventListener("message", function (e) {
+    if (e && e.data && e.data.type === "alma-open-diag") buildPanel();
+  });
+
+  // 样式（面板本体；入口在设置页里克隆 renderer 自己的行，无需额外样式）
   try {
     var st = document.createElement("style");
     st.textContent =
@@ -283,25 +346,7 @@
       ".ad-btns{display:flex;gap:8px;padding:10px 16px 14px;flex-wrap:wrap;}" +
       ".ad-b{all:unset;cursor:pointer;font-size:12.5px;padding:7px 12px;border-radius:8px;background:rgba(255,255,255,.09);color:#e8eaed;}" +
       ".ad-b:active{background:rgba(255,255,255,.22);}" +
-      "#alma-diag-toast{display:none;position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(28,30,35,.95);padding:8px 14px;border-radius:9px;font-size:12.5px;color:#e8eaed;max-width:86%;white-space:pre-wrap;}" +
-      "#alma-diag-fab{position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:2147482300;" +
-      "width:30px;height:30px;border:0;border-radius:50%;background:rgba(60,64,72,.72);color:#aab0ba;font-size:12px;" +
-      "display:flex;align-items:center;justify-content:center;opacity:.55;cursor:pointer;}";
+      "#alma-diag-toast{display:none;position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(28,30,35,.95);padding:8px 14px;border-radius:9px;font-size:12.5px;color:#e8eaed;max-width:86%;white-space:pre-wrap;}";
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
-
-  var fab = document.createElement("button");
-  fab.id = "alma-diag-fab";
-  fab.type = "button";
-  fab.textContent = "诊";
-  fab.title = "连接诊断";
-  fab.addEventListener("click", buildPanel);
-  var ensureFab = function () {
-    if (!document.body || document.getElementById("alma-diag-fab")) return;
-    document.body.appendChild(fab);
-  };
-  if (document.body) ensureFab();
-  else document.addEventListener("DOMContentLoaded", ensureFab);
-  // renderer 重渲染可能吞节点 —— 兜底重挂
-  setInterval(ensureFab, 4000);
 })();

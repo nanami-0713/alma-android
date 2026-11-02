@@ -971,7 +971,12 @@
         var el = panels[j], cs = getComputedStyle(el);
         if (cs.position !== "fixed" || cs.zIndex !== "201") continue;
         var r = el.getBoundingClientRect();
-        if (r.width >= 180 && r.height >= innerHeight * 0.7 && r.left > -40 && r.left < 40) return true;
+        if (r.width >= 180 && r.height >= innerHeight * 0.7 && r.left < 40
+            // 抽屉从屏幕外滑入：关闭态停在完全屏外（left ≈ -width）。动画
+            // 第一帧起 left 就离开 -width —— 用「离开屏外」而非「接近 0」
+            // 判定，pill 才能在动画首帧隐藏而非等动画走完 88%（-32 实机
+            // 「抽屉打开动画中 pill 残留」的根因）
+            && r.left > -r.width * 0.9) return true;
       }
       var dl = document.querySelectorAll('[role="dialog"]');
       for (var k = 0; k < dl.length; k++) {
@@ -1038,9 +1043,15 @@
       ensurePill();
     });
   }, 8000);
-  // renderer 重渲染可能吞 pill —— 与更新 pill 同款兜底
+  // renderer 重渲染可能吞 pill —— 与更新 pill 同款兜底。
+  // 方向性节流（-32 实机反馈「抽屉打开动画中 pill 残留」）：隐藏方向即时
+  // （任何 mutation 立刻查、立刻摘——抽屉第一帧 class 变化 pill 就没了），
+  // 重挂方向 300ms 防抖（防动画中途的中间态闪现）。点按 ⋯ 菜单钮的
+  // pointerdown 也同步查一次（动画开始前就隐藏）。
+  function pillCheckNow() { ensurePill(); }
   if (window.MutationObserver) {
     var obs = new MutationObserver(function () {
+      pillCheckNow();
       if (obs.__t) return;
       obs.__t = setTimeout(function () { obs.__t = 0; ensurePill(); }, 300);
     });
@@ -1050,6 +1061,8 @@
     };
     start();
   }
+  document.addEventListener("pointerdown", pillCheckNow, true);
+  document.addEventListener("transitionstart", pillCheckNow, true);
   setTimeout(function () { e2eActive().then(function (ok) { S.e2e = ok; ensurePill(); }); }, 1500);
 
   // ── 样式 ────────────────────────────────────────────────────────────
