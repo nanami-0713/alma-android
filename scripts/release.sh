@@ -172,7 +172,7 @@ git push origin "$TAG"
 gh release create "$TAG" "/tmp/$ASSET#$ASSET" \
   --repo nanami-0713/alma-android \
   --title "Alma Android $TAG" \
-  "${PRERELEASE[@]}" \
+  ${PRERELEASE[@]+"${PRERELEASE[@]}"} \
   --notes "$NOTES"
 
 echo "✓ 发布完成：${TAG}（资产 ${ASSET}，latest.json 已随 ${BRANCH} 推送）"
