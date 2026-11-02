@@ -402,7 +402,8 @@
     sendBtn.setAttribute("aria-label", "send");
     function commit() {
       var v = input.value;
-      if (!v) return;
+      // 空 + 回车/发送 = 电脑的回车键（终端等场景的主用法）
+      if (!v) { if (!S.viewOnly) send({ type: "key", key: "enter" }); return; }
       input.value = "";
       send({ type: "text", text: v });
     }
@@ -760,8 +761,40 @@
 
   // ── 入口 pill（⋯ 菜单钮下方，更新 pill 同款机制） ────────────────────
   S.e2e = null;   // null=未知 true/false=上次检测结果
+  // renderer 自己的覆层开着（会话抽屉 z-201 / 全屏 dialog / 设置层 iframe）
+  // 时 pill 不露头 —— 否则浮在抽屉上面（v0.4.378-24 实机反馈）。
+  // 判定逻辑与 alma-droid-shim 的 rendererOverlayOpen 同款。
+  function settingsLayerOpen() {
+    var f = document.getElementById("alma-settings-frame");
+    return !!(f && f.style.display !== "none");
+  }
+  function rendererOverlayOpen() {
+    try {
+      var scrims = document.querySelectorAll('body > div[class*="z-["]');
+      for (var i = 0; i < scrims.length; i++) {
+        var s = scrims[i], sc = getComputedStyle(s);
+        if (sc.position === "fixed" && sc.zIndex === "200" && sc.pointerEvents !== "none"
+            && s.getBoundingClientRect().width >= innerWidth * 0.9) return true;
+      }
+      var panels = document.querySelectorAll('div[class*="z-["]');
+      for (var j = 0; j < panels.length; j++) {
+        var el = panels[j], cs = getComputedStyle(el);
+        if (cs.position !== "fixed" || cs.zIndex !== "201") continue;
+        var r = el.getBoundingClientRect();
+        if (r.width >= 180 && r.height >= innerHeight * 0.7 && r.left > -40 && r.left < 40) return true;
+      }
+      var dl = document.querySelectorAll('[role="dialog"]');
+      for (var k = 0; k < dl.length; k++) {
+        var d = dl[k];
+        if (d.id === "alma-update-dialog" || d.id === "alma-screen-viewer") continue;
+        var dr = d.getBoundingClientRect();
+        if (dr.width * dr.height >= innerWidth * innerHeight * 0.5) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
   function pillShouldShow() {
-    return S.e2e === true && !S.open;
+    return S.e2e === true && !S.open && !settingsLayerOpen() && !rendererOverlayOpen();
   }
   function findMenuToggle() {
     try {
@@ -790,7 +823,15 @@
       (document.body || document.documentElement).appendChild(pill);
     }
     var tr = toggle.getBoundingClientRect();
-    var pos = Math.round(tr.left) + "x" + Math.round(tr.bottom + 6);
+    // 图形对齐（v0.4.378-24 实机反馈「没对齐」）：pill 内 svg 是 16px 居中于
+    // 30px 宽 → 内缩 7px；取菜单钮 svg 的实际左缘，让两个图形左缘重合，
+    // 而不是按钮盒子对盒子（按钮盒有内边距，视觉上会偏右）。
+    var PILL_ICON_INSET = 7;
+    var tsvg = toggle.querySelector("svg");
+    var iconLeft = tsvg ? tsvg.getBoundingClientRect().left : tr.left;
+    var left = Math.round(iconLeft - PILL_ICON_INSET);
+    var top = Math.round(tr.bottom + 6);
+    var pos = left + "x" + top;
     if (pill.dataset.pos === pos) return;
     pill.dataset.pos = pos;
     var dark = document.documentElement.classList.contains("dark");
@@ -798,7 +839,7 @@
       "position:fixed;z-index:2147482000;display:inline-flex;align-items:center;justify-content:center;" +
       "width:30px;height:30px;border:0;border-radius:9px;cursor:pointer;" +
       "background:" + (dark ? "#4a4f58" : "#d8dce3") + ";color:" + (dark ? "#f2ead8" : "#3a3f47") + ";" +
-      "box-shadow:0 1px 4px rgba(0,0,0,.25);left:" + Math.round(tr.left) + "px;top:" + Math.round(tr.bottom + 6) + "px;";
+      "box-shadow:0 1px 4px rgba(0,0,0,.25);left:" + left + "px;top:" + top + "px;";
   }
   // E2E 状态轮询（wsBase 内带 5s 缓存，这里 8s 一轮足够；配对/忘记都会整页重载）
   setInterval(function () {
