@@ -76,6 +76,7 @@
     kbps: 0,
     frameCount: 0,
     pc: null,              // RTCPeerConnection
+    dc: null,              // 输入数据通道（rtc 连接后由服务端创建）
     rtcOn: false,
     rtcTried: false,
     wakeLock: null,
@@ -84,9 +85,17 @@
 
   // ── 工具 ────────────────────────────────────────────────────────────
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  // 输入类消息优先走 WebRTC 数据通道（直连时显著低于中继 WS 的往返），
+  // 未连接/未开则回落 WS。rtc_* 控制消息必须走 WS（服务端 DC 入口会丢弃）。
+  var INPUT_TYPES = { pointer: 1, scroll: 1, text: 1, key: 1, clipboard: 1 };
   function send(obj) {
+    var j = JSON.stringify(obj);
+    var ch = S.dc;
+    if (ch && ch.readyState === "open" && INPUT_TYPES[obj.type]) {
+      try { ch.send(j); return; } catch (e) {}
+    }
     if (S.ws && S.ws.readyState === 1) {
-      try { S.ws.send(JSON.stringify(obj)); } catch (e) {}
+      try { S.ws.send(j); } catch (e) {}
     }
   }
 
@@ -229,9 +238,22 @@
         v.srcObject = ev.streams[0];
         v.style.display = "block";
         if (S.ui.img) S.ui.img.style.display = "none";
+        if (S.ui.canvas) S.ui.canvas.style.display = "none";
+        // 视频侧延迟：jitter buffer 压到最低（Chrome 专有 hint，忽略不支持）
+        try {
+          if ("playoutDelayHint" in ev.receiver) ev.receiver.playoutDelayHint = 0;
+        } catch (e) {}
         // 视频通道码率：本地 getStats 采样（rtc_stats 字段不稳，自己算最可靠）
         startRtcStats(pc);
       }
+    };
+    // 服务端创建的输入数据通道：连上后 pointer/scroll/text/key/clipboard
+    // 改走这里（直连路径比中继 WS 低延迟；见 send()）。会话只开一条，直接接管。
+    pc.ondatachannel = function (ev) {
+      var ch = ev.channel || {};
+      S.dc = ch;
+      ch.onclose = function () { if (S.dc === ch) S.dc = null; };
+      ch.onerror = function () { if (S.dc === ch) S.dc = null; };
     };
     pc.onicecandidate = function (ev) {
       if (ev.candidate) send({ type: "rtc_ice", candidate: ev.candidate.toJSON ? ev.candidate.toJSON() : ev.candidate });
@@ -270,12 +292,14 @@
   }
   function rtcTeardown() {
     if (rtcStatsTimer) { clearInterval(rtcStatsTimer); rtcStatsTimer = 0; }
+    S.dc = null;
     var pc = S.pc;
     S.pc = null;
     if (pc) { try { pc.close(); } catch (e) {} }
     var v = S.ui.video;
     if (v) { try { v.srcObject = null; } catch (e) {} v.style.display = "none"; }
     if (S.ui.img) S.ui.img.style.display = "block";
+    if (S.ui.canvas) S.ui.canvas.style.display = "block";
   }
   // 视频通道看门狗：rtc 已连接但 <video> 5s 不前进（个别 WebView 解码/协商
   // 异常只会黑屏）→ rtc_stop 退回 jpeg（rtcTried 已置位，不会反复重试）
@@ -296,30 +320,51 @@
   }, 1500);
 
   // ── 帧渲染 ──────────────────────────────────────────────────────────
-  var imgBusy = false;
+  // 低延迟链路：base64 → Blob → createImageBitmap（离屏线程解码）→ canvas 1:1
+  // 绘制。比 img.src=dataURL（同步解析 + 异步解码 + 额外拷贝）快且少占主线程。
+  // 解码慢于来帧时只保留最新一帧（跳中间帧 = 恒低延迟）。
+  var bmpBusy = false;
   function syncFrameSize() {
     if (!S.capW || !S.ui.stage) return;
-    var img = S.ui.img, video = S.ui.video;
-    if (img.style.width !== S.capW + "px") {
-      img.style.width = S.capW + "px";
-      img.style.height = S.capH + "px";
-    }
-    if (video.style.width !== S.capW + "px") {
-      video.style.width = S.capW + "px";
-      video.style.height = S.capH + "px";
+    var img = S.ui.img, video = S.ui.video, canvas = S.ui.canvas;
+    var w = S.capW + "px", h = S.capH + "px";
+    [img, video, canvas].forEach(function (el) {
+      if (el && el.style.width !== w) { el.style.width = w; el.style.height = h; }
+    });
+    if (canvas && (canvas.width !== S.capW || canvas.height !== S.capH)) {
+      canvas.width = S.capW; canvas.height = S.capH;
     }
   }
+  function b64ToBytes(b64) {
+    var bin = atob(b64), n = bin.length, out = new Uint8Array(n);
+    for (var i = 0; i < n; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
   function showJpegFrame(b64) {
+    var canvas = S.ui.canvas;
+    if (!canvas) return;
+    if (!canvas.ctx) canvas.ctx = canvas.getContext("2d");
+    if (!window.createImageBitmap) return showJpegFrameFallback(b64);
+    if (bmpBusy) { canvas.pending = b64; return; }
+    bmpBusy = true;
+    canvas.pending = null;
+    var blob = new Blob([b64ToBytes(b64)], { type: "image/jpeg" });
+    createImageBitmap(blob).then(function (bmp) {
+      canvas.ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      if (bmp.close) bmp.close();
+      bmpBusy = false;
+      if (canvas.pending) { var p = canvas.pending; canvas.pending = null; showJpegFrame(p); }
+    }).catch(function () {
+      bmpBusy = false;
+      showJpegFrameFallback(b64);
+    });
+  }
+  // 兜底：无 createImageBitmap 的环境走 img 元素
+  function showJpegFrameFallback(b64) {
     var img = S.ui.img;
     if (!img) return;
-    if (imgBusy) { img.pending = b64; return; }   // 上一帧还没解码完：只留最新
-    imgBusy = true;
-    img.onload = function () {
-      img.onload = null;
-      imgBusy = false;
-      if (img.pending) { var p = img.pending; img.pending = null; showJpegFrame(p); }
-    };
-    img.onerror = function () { img.onload = null; imgBusy = false; };
+    img.style.display = "block";
+    if (S.ui.canvas) S.ui.canvas.style.display = "none";
     img.src = "data:image/jpeg;base64," + b64;
   }
 
@@ -334,13 +379,14 @@
     stageWrap.className = "asv-stage";
     var img = document.createElement("img");
     img.alt = ""; img.draggable = false;
-    img.naturalW = 0; img.pending = null;
+    img.style.display = "none";   // 首选 canvas；仅兜底时显示
+    var canvas = document.createElement("canvas");
     var video = document.createElement("video");
     video.autoplay = true; video.playsInline = true; video.muted = true;
     video.style.display = "none";
     var stage = document.createElement("div");
     stage.className = "asv-frame";
-    stage.appendChild(img); stage.appendChild(video);
+    stage.appendChild(canvas); stage.appendChild(img); stage.appendChild(video);
     stageWrap.appendChild(stage);
     var badge = document.createElement("div");
     badge.className = "asv-viewonly"; badge.textContent = t("viewOnly"); badge.style.display = "none";
@@ -426,7 +472,8 @@
     (document.body || document.documentElement).appendChild(root);
 
     S.ui = {
-      root: root, bar: bar, stageWrap: stageWrap, stage: stage, img: img, video: video,
+      root: root, bar: bar, stageWrap: stageWrap, stage: stage, img: img,
+      canvas: canvas, video: video,
       stat: stat, dot: dot, zoomChip: zoomChip, badge: badge, toastEl: toastEl,
       input: input, keys: keys
     };
@@ -537,13 +584,67 @@
   // ── 手势 ────────────────────────────────────────────────────────────
   // 一指：直接控制（按下=鼠标按下；移动=拖动；抬起=释放；轻点=click；
   //       双击=double；长按 500ms=右键）
-  // 双指：捏合=缩放视图；间距稳定的拖动=Mac 滚轮（增量按显示像素 1:1 物理）
-  // 三指：拖动=平移视图（放大后用）
+  // 双指：捏合=缩放视图；拖动=Mac 滚轮。
+  //       意图判定以手势「起点」为锚（瞬时采样抖动会误判）；滚轮增量
+  //       合并后 30Hz 发送 —— 逐事件直发会在中继上堆积小消息、Mac 端
+  //       helper 串行队列雪崩，是「偶尔延迟很高」的元凶。
+  // 三指（及以上）：拖动=平移视图，全指质心跟踪；抬指自动换基点不跳变；
+  //       松手带惯性滑行（衰减 0.92/帧），任何新按下立即截停。
+  var panMomentum = { raf: 0, vx: 0, vy: 0 };
+  function stopPanMomentum() {
+    if (panMomentum.raf) { cancelAnimationFrame(panMomentum.raf); panMomentum.raf = 0; }
+    panMomentum.vx = panMomentum.vy = 0;
+  }
+  function panBy(dx, dy) {
+    S.panX += dx; S.panY += dy;
+    clampPan(); applyTransform();
+  }
+  function startPanMomentum() {
+    // 只取消已排期的帧，保留速度（先 stop 会清零 vx/vy，惯性就永远 0 速起步）
+    if (panMomentum.raf) { cancelAnimationFrame(panMomentum.raf); panMomentum.raf = 0; }
+    if (Math.abs(panMomentum.vx) + Math.abs(panMomentum.vy) < 0.15) return;
+    var step = function () {
+      panMomentum.vx *= 0.92; panMomentum.vy *= 0.92;
+      if (Math.abs(panMomentum.vx) < 0.15 && Math.abs(panMomentum.vy) < 0.15) {
+        panMomentum.raf = 0; return;
+      }
+      panBy(panMomentum.vx, panMomentum.vy);
+      panMomentum.raf = requestAnimationFrame(step);
+    };
+    panMomentum.raf = requestAnimationFrame(step);
+  }
+  // 滚轮合并器：累计增量 + 最新质心，33ms 冲刷一次
+  var scrollAcc = { dx: 0, dy: 0, x: 0.5, y: 0.5, dirty: false, timer: 0 };
+  function queueScroll(x, y, dx, dy) {
+    scrollAcc.dx += dx; scrollAcc.dy += dy; scrollAcc.x = x; scrollAcc.y = y;
+    scrollAcc.dirty = true;
+    if (!scrollAcc.timer) {
+      scrollAcc.timer = setTimeout(function () {
+        scrollAcc.timer = 0;
+        if (!scrollAcc.dirty || S.viewOnly) { scrollAcc.dirty = false; return; }
+        scrollAcc.dirty = false;
+        send({ type: "scroll", x: scrollAcc.x, y: scrollAcc.y,
+               dx: Math.round(scrollAcc.dx), dy: Math.round(scrollAcc.dy) });
+        scrollAcc.dx = 0; scrollAcc.dy = 0;
+      }, 33);
+    }
+  }
+  function displayScale() {
+    // 手指 view px → Mac 显示像素（逻辑像素）
+    var sc = fitScale() * S.zoom;
+    return (S.status && S.capW ? S.status.width / S.capW : 1) / (sc || 1);
+  }
+  function centroidOf(map) {
+    var x = 0, y = 0, n = 0;
+    map.forEach(function (p) { x += p.x; y += p.y; n++; });
+    return n ? { x: x / n, y: y / n } : null;
+  }
+
   function installGestures(el) {
     var pointers = new Map();       // pointerId → {x,y}
-    var prim = null;                // 主指针手势状态
-    var second = null;              // 双指几何
-    var third = null;               // 三指平移
+    var prim = null;                // 单指手势状态
+    var second = null;              // 双指几何（p0=手势锚点）
+    var third = null;               // 三指平移基点（质心）
     var lastMoveSend = 0;
 
     function pinchInfo() {
@@ -554,6 +655,7 @@
     }
 
     el.addEventListener("pointerdown", function (e) {
+      stopPanMomentum();
       el.setPointerCapture && el.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
@@ -577,13 +679,12 @@
         }
         if (prim && prim.lpTimer) clearTimeout(prim.lpTimer);
         prim = null;
-        second = { p: pinchInfo(), mode: null };
+        second = { p: pinchInfo(), p0: pinchInfo(), mode: null, accX: 0, accY: 0 };
         third = null;
       } else if (pointers.size >= 3) {
-        second = null;
-        var pts = Array.from(pointers.values()).slice(-3);
-        third = { x: pts.reduce(function (a, p) { return a + p.x; }, 0) / pts.length,
-                  y: pts.reduce(function (a, p) { return a + p.y; }, 0) / pts.length };
+        second = null;   // 三指及以上接管：双指手势（可能刚起步）作废，
+                         // 未发出的累计增量随之丢弃 → 落指瞬间的误滚轮消失
+        third = centroidOf(pointers);
       }
     });
 
@@ -609,41 +710,43 @@
 
       if (pointers.size === 2 && second) {
         var cur = pinchInfo();
-        var prev = second.p;
-        if (!cur || !prev) return;
-        var dSpan = cur.span - prev.span;
+        var prev = second.p, anchor = second.p0;
+        if (!cur || !prev || !anchor) return;
         var cx = cur.cx - prev.cx, cy = cur.cy - prev.cy;
-        var centroidMove = Math.hypot(cx, cy);
+        // 意图判定：相对手势锚点（起点）累计位移，而非相邻采样差
         if (second.mode === null) {
-          // 头几次 move 判定意图：间距变化显著 = 捏合；平移显著 = 滚动
-          if (Math.abs(dSpan) > 8) second.mode = "pinch";
-          else if (centroidMove > 8) second.mode = "scroll";
+          if (Math.abs(cur.span - anchor.span) > 10) second.mode = "pinch";
+          else if (Math.hypot(cur.cx - anchor.cx, cur.cy - anchor.cy) > 12) second.mode = "scroll";
         }
         if (second.mode === "pinch") {
           var ns = clamp(S.zoom * (cur.span / prev.span), 1, 8);
           S.zoom = ns; S.zoomFit = (ns === 1);
           clampPan(); applyTransform();
         } else if (second.mode === "scroll") {
+          second.accX += cx; second.accY += cy;
           var nrm = norm(cur.cx, cur.cy);
-          if (nrm && !S.viewOnly) {
-            var sc = fitScale() * S.zoom;
-            // 手指 view px → 显示像素（1:1 物理手感），方向同 Mac 触控板「自然滚动」
-            send({ type: "scroll", x: nrm.x, y: nrm.y,
-                   dx: Math.round(-cx / sc * (S.status ? S.status.width / S.capW : 1)),
-                   dy: Math.round(-cy / sc * (S.status ? S.status.width / S.capW : 1)) });
+          if (nrm) {
+            var k = displayScale();
+            // 自然滚动：内容跟随手指
+            queueScroll(nrm.x, nrm.y, Math.round(-second.accX * k), Math.round(-second.accY * k));
           }
+          second.accX = 0; second.accY = 0;
         }
         second.p = cur;
         return;
       }
 
       if (pointers.size >= 3 && third) {
-        var pts2 = Array.from(pointers.values()).slice(-3);
-        var tx = pts2.reduce(function (a, p) { return a + p.x; }, 0) / pts2.length;
-        var ty = pts2.reduce(function (a, p) { return a + p.y; }, 0) / pts2.length;
-        S.panX += tx - third.x; S.panY += ty - third.y;
-        clampPan(); applyTransform();
-        third = { x: tx, y: ty };
+        var c = centroidOf(pointers);
+        if (!c) return;
+        var px = c.x - third.x, py = c.y - third.y;
+        if (px || py) {
+          panBy(px, py);
+          // 速度估计：指数平滑，单位 px/16ms 帧
+          panMomentum.vx = panMomentum.vx * 0.7 + px * 0.3;
+          panMomentum.vy = panMomentum.vy * 0.7 + py * 0.3;
+        }
+        third = c;
       }
     });
 
@@ -673,20 +776,26 @@
           prim = null;
         }
         second = null; third = null;
+        // 平移惯性：松手前的速度继续滑行
+        if (Math.abs(panMomentum.vx) + Math.abs(panMomentum.vy) > 1.2) startPanMomentum();
+        else stopPanMomentum();
       } else if (pointers.size === 1) {
         second = null; third = null;
         // 从多指回到一指：不接管为新的控制手势（避免误拖），等全部抬起
         prim = null;
+        if (Math.abs(panMomentum.vx) + Math.abs(panMomentum.vy) > 1.2) startPanMomentum();
       } else if (pointers.size === 2) {
+        // 三指中抬了一指：换基点继续平移（质心跳变不产生位移）
         third = null;
-        second = { p: pinchInfo(), mode: null };
+        second = { p: pinchInfo(), p0: pinchInfo(), mode: null, accX: 0, accY: 0 };
+      } else {
+        // ≥3 指中抬了一指：质心重定位
+        third = centroidOf(pointers);
       }
     }
     el.addEventListener("pointerup", endPointer);
     el.addEventListener("pointercancel", endPointer);
     el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-
-    // Mac 剪贴板 → 手机已同步；双击 stage 空白区不缩放（双击是 double click）
   }
 
   // ── 打开 / 关闭 ─────────────────────────────────────────────────────
@@ -740,7 +849,17 @@
   window.__almaScreenRemote = {
     open: openViewer,
     close: closeViewer,
-    handleBack: function () { if (S.open) { closeViewer(); return true; } return false; }
+    handleBack: function () { if (S.open) { closeViewer(); return true; } return false; },
+    // 现场排查用：通道/手势状态快照（不做任何控制）
+    __dbg: function () {
+      return {
+        open: S.open, wsState: S.wsState, rtcOn: S.rtcOn,
+        dc: S.dc ? S.dc.readyState : null, frames: S.frameCount,
+        kbps: S.kbps, zoom: Math.round(S.zoom * 10) / 10,
+        pan: [Math.round(S.panX), Math.round(S.panY)],
+        viewOnly: S.viewOnly, cap: S.capW + "x" + S.capH
+      };
+    }
   };
 
   // ── 屏幕常亮 ────────────────────────────────────────────────────────
@@ -888,7 +1007,7 @@
     ".asv-stage{position:relative;flex:1;min-height:0;overflow:hidden;display:flex;",
     "align-items:center;justify-content:center;background:#0a0b0d;}",
     ".asv-frame{position:relative;transform-origin:center center;will-change:transform;line-height:0;}",
-    ".asv-frame img,.asv-frame video{display:block;max-width:none;object-fit:fill;background:#17181c;}",
+    ".asv-frame img,.asv-frame video,.asv-frame canvas{display:block;max-width:none;object-fit:fill;background:#17181c;}",
     ".asv-viewonly{position:absolute;top:10px;left:50%;transform:translateX(-50%);",
     "background:rgba(255,159,10,.92);color:#fff;font-size:11.5px;font-weight:600;",
     "padding:3px 10px;border-radius:9999px;pointer-events:none;}",
