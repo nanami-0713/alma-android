@@ -134,3 +134,11 @@
 - **诊断手法**：`document.elementsFromPoint(x,y)` 取叠层序列（plural 版才给全序），配合沿 parentElement 链收集 position/z-index——一眼看出 chrome 钮(fixed,100) 在 dock 钮(fixed,2147480000)<(relative,10) 之上。
 - **修法**：竖屏规则补 `body:has([data-right-dock]) [data-layout-chrome-actions], body:has([data-right-dock]) .fixed.top-1.z-\[100\] {visibility:hidden}`（整行 + 资源宿主；横屏维持只隐右侧钮组）。dock 打开时竖屏右上角唯一可点元素 = dock 自己的关闭钮。抽屉（z-201）虽也浮在 dock 上，但整行隐藏后竖屏全屏页无抽屉入口，状态不可达。
 - **教训**：**「整页覆盖 + 大 z-index」在有层叠上下文祖先时是幻觉**——跨上下文比的是祖先的 z。上模拟器验证时要用 elementsFromPoint 在「出事坐标」确认 topmost 归属，不能只看自己的 rect/截图中部。
+
+## 2026-11-02 renderer 0.4.213→0.4.378 大版本同步（beta 分支流程）
+
+- **致命方法论坑：别把打过补丁的 www/ 当原始树读**。判断「上游是否已吸收某补丁」必须对照 alma-re/app/out/renderer（sync-assets 每次从它全量重拷）。本次因读了已打补丁的 www，误判 C/D（isIOS 含 android、dataset 同步初始化）被上游吸收而删掉 → 装机后顶栏冒出桌面窗口控件三连键（Minus/Maximize/X，无 aria-label 只有 title，DOM 查询用 aria-label 查不到）。修复 = C/D 恢复；E 才是真被上游改掉（WindowControls 内 `if (isIOS) return null`，吃 C 的 context.isIOS）。
+- **sync-assets 文件名锚全部改为按内容搜索**：chunk hash 每版必变（App-CHUt1SP7→App-CJD1Pyfa、connected-D8mcBngn→connected-C8Gvg28Q），固定文件名是自寻死路；唯一不稳的内容锚是压缩变量名（isMac→isMac2）。
+- **0.4.378 手机端新架构实证**：connected chunk `sendFrame` → `encodeInnerFrame(frame, this.binary)` + `ws.binaryType="arraybuffer"`——握手仍是 JSON 字符串，握手后内层帧二进制密封直发，按会话协商（老桌面退回 base64 v1）。hreq 的 `b: body` 不再 b64uEncode。
+- **App chunk 自带一份 PlatformContext 消费**（`const { isIOS: IS_PHONE, isMac: isMac2 } = usePlatformContext()`），窗口控件门控 `!isMac2 && !isIOS && platform !== "connected" && !isWin98Theme` 全吃 context 值——C 补丁一处生效全局生效。
+- beta 发布通道：GitHub prerelease 不进 /releases/latest，latest.json 在 main 不动 → 正式用户与 beta 用户互不干扰；beta versionName 0.4.378-1，验收后合 main 走 release.sh 出 0.4.378-2，beta 机自动收到升级提示。
