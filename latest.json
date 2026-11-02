@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-29",
-  "apk": "alma-android-v0.4.378-29.apk",
-  "notes": "beta 修复：局域网直连的冷启动引导\n\n- 修同 WiFi 下仍走中继超时的问题：全新安装无直连缓存时，通过网关探测\n  找到所在网段并自动扫出 Mac（不再依赖已被浏览器隐私策略屏蔽的本机 IP）\n- 中继彻底断开时也能自动引导出直连；连接失败会立即触发后台发现",
+  "tag": "v0.4.378-30",
+  "apk": "alma-android-v0.4.378-30.apk",
+  "notes": "beta 修复：局域网直连的失败保护与路径显示\n\n- 直连若在真机被系统拦截，两次失败后自动作废并冷却 1 小时（不再每次\n  连接都白等直连再回落中继——「已连接但数据加载不出」的主因）\n- 直连生效时会弹提示「已通过局域网直连你的 Mac」，一眼可辨连接路径\n- 中继路径的业务接口经直连隧道验证毫秒级正常",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-29/alma-android-v0.4.378-29.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-30/alma-android-v0.4.378-30.apk"
   ]
 }
