@@ -1,8 +1,8 @@
 {
-  "tag": "v0.4.378-26",
-  "apk": "alma-android-v0.4.378-26.apk",
-  "notes": "beta：触控与延迟优化\n\n- 双指滚动事件合并（30Hz），消除偶发高延迟（小消息灌中继 + Mac 端队列雪崩）\n- 输入改走 WebRTC 数据通道（直连时往返更低）；视频 jitter buffer 压到最低\n- JPEG 帧解码提速（离屏 bitmap → canvas）\n- 三指平移：跟手性重写（全指质心 + 抬指换基点不跳变）+ 松手惯性滑行；\n  落第三指不再误触 Mac 滚轮",
+  "tag": "v0.4.378-27",
+  "apk": "alma-android-v0.4.378-27.apk",
+  "notes": "beta：拖动视图模式 + 空框按键直通电脑\n\n- 放大后顶栏出现「拖动视图」开关：单指平移画面（带惯性），不再依赖常被\n  ROM 抢走的三指手势；轻点不会误触 Mac\n- 输入框为空时：退格/delete/方向键/tab/esc 与回车一样直接作用于电脑\n  —— 终端里打错的字能删了\n- 按键条新增 ⌫（长按连发）",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-26/alma-android-v0.4.378-26.apk"
+    "https://gh-proxy.com/https://github.com/nanami-0713/alma-android/releases/download/v0.4.378-27/alma-android-v0.4.378-27.apk"
   ]
 }
